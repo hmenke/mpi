@@ -28,6 +28,7 @@
 #include "./generic_communication.hpp"
 #include "./lazy.hpp"
 #include "./operators.hpp"
+#include "./window.hpp"
 
 namespace mpi {
 
