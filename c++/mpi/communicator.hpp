@@ -31,6 +31,8 @@
 
 namespace mpi {
 
+  class shared_communicator;
+
   /**
    * @ingroup mpi_essentials
    * @brief C++ wrapper around `MPI_Comm` providing various convenience functions.
@@ -41,6 +43,7 @@ namespace mpi {
    * All functions that make direct calls to the MPI C library throw an exception in case the call fails.
    */
   class communicator {
+    friend class shared_communicator;
     // Wrapped `MPI_Comm` object.
     MPI_Comm _com = MPI_COMM_WORLD;
 
@@ -56,6 +59,8 @@ namespace mpi {
 
     /// Get the wrapped `MPI_Comm` object.
     [[nodiscard]] MPI_Comm get() const noexcept { return _com; }
+
+    [[nodiscard]] bool is_null() const noexcept { return _com == MPI_COMM_NULL; }
 
     /**
      * @brief Get the rank of the calling process in the communicator.
@@ -103,6 +108,8 @@ namespace mpi {
       } else
         return {};
     }
+
+    [[nodiscard]] shared_communicator split_shared(int split_type = MPI_COMM_TYPE_SHARED, int key = 0) const;
 
     /**
      * @brief Duplicate the communicator.
@@ -186,5 +193,17 @@ namespace mpi {
       }
     }
   };
+
+  /// The shared communicator class
+  class shared_communicator : public communicator {};
+
+  [[nodiscard]] inline shared_communicator communicator::split_shared(int split_type, int key) const {
+    if (has_env) {
+      shared_communicator c;
+      MPI_Comm_split_type(_com, split_type, key, MPI_INFO_NULL, &c._com);
+      return c;
+    } else
+      return {};
+  }
 
 } // namespace mpi
