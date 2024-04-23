@@ -38,17 +38,6 @@ namespace mpi {
    * @{
    */
 
-  namespace detail {
-
-    // Helper function to get the memory displacements of the different elements in a tuple w.r.t. the first element.
-    template <typename... Ts, size_t... Is> void _init_mpi_tuple_displ(std::index_sequence<Is...>, std::tuple<Ts...> tup, MPI_Aint *disp) {
-      ((disp[Is] = (char *)&std::get<Is>(tup) - (char *)&std::get<0>(tup)), ...);
-      auto min_el = std::min_element(disp, disp + sizeof...(Ts));
-      ((disp[Is] -= *min_el), ...);
-    }
-
-  } // namespace detail
-
   /**
    * @brief Map C++ datatypes to the corresponding MPI datatypes.
    *
@@ -123,7 +112,13 @@ namespace mpi {
 
     // displacements of the blocks in bytes w.r.t. to the memory address of the first block
     std::array<MPI_Aint, N> disp;
-    detail::_init_mpi_tuple_displ(std::index_sequence_for<Ts...>{}, tup, disp.data());
+    // initialize displacement array from the tuple element addresses
+    []<size_t... Is>(std::index_sequence<Is...>, auto &tup, MPI_Aint *disp) {
+      ((disp[Is] = (char *)&std::get<Is>(tup) - (char *)&std::get<0>(tup)), ...);
+      // account for non-trivial memory layouts of the tuple elements
+      auto min_el = *std::min_element(disp, disp + sizeof...(Ts));
+      ((disp[Is] -= min_el), ...);
+    }(std::index_sequence_for<Ts...>{}, tup, disp.data());
 
     // create and return MPI datatype
     MPI_Datatype cty{};
