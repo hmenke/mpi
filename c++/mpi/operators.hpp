@@ -50,6 +50,11 @@ namespace mpi {
     return myOp;
   }
 
+  namespace detail {
+    // Generic addition. FIXME Convert to lambda, requires gcc 13.2+
+    template <typename T> T generic_add(T const &lhs, T const &rhs) { return lhs + rhs; }
+  } // namespace detail
+
   /**
    * @brief Create a new `MPI_Op` for a generic addition by calling `MPI_Op_create`.
    *
@@ -58,9 +63,6 @@ namespace mpi {
    * @tparam T Type used for the addition.
    * @return `MPI_Op` for the generic addition of the given type.
    */
-  template <typename T> MPI_Op map_add() {
-    auto generic_add = [](T const &lhs, T const &rhs) { return lhs + rhs; };
-    return map_C_function<T, generic_add>();
-  }
+  template <typename T> MPI_Op map_add() { return map_C_function<T, detail::generic_add>(); }
 
 } // namespace mpi
