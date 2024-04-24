@@ -4,6 +4,6 @@
 
 mpi is a high-level C++ interface to the [Message Passing Interface](https://en.wikipedia.org/wiki/Message_Passing_Interface).
 
-A prelimenary reference documentation based on [Doxygen](https://www.doxygen.nl) is provided at [triqs.github.io/mpi](https://triqs.github.io/mpi/latest/).
+A reference documentation based on [Doxygen](https://www.doxygen.nl) is provided at [triqs.github.io/mpi](https://triqs.github.io/mpi).
 
 For usage examples we refer the users to our [tests](https://github.com/TRIQS/mpi/tree/unstable/test/c++).
