@@ -210,7 +210,8 @@ namespace mpi {
    * @param c mpi::communicator.
    * @param root Rank of the root process.
    */
-  template <typename T> requires(has_mpi_type<T>)
+  template <typename T>
+    requires(has_mpi_type<T>)
   void mpi_broadcast(T &x, communicator c = {}, int root = 0) {
     MPI_Bcast(&x, 1, mpi_type<T>::get(), root, c.get());
   }
@@ -227,7 +228,8 @@ namespace mpi {
    * @param op `MPI_Op` used in the reduction.
    * @return The result of the reduction.
    */
-  template <typename T> requires(has_mpi_type<T>)
+  template <typename T>
+    requires(has_mpi_type<T>)
   T mpi_reduce(T const &x, communicator c = {}, int root = 0, bool all = false, MPI_Op op = MPI_SUM) {
     T b;
     auto d = mpi_type<T>::get();
@@ -250,7 +252,8 @@ namespace mpi {
    * @param all Should all processes receive the result of the reduction.
    * @param op `MPI_Op` used in the reduction.
    */
-  template <typename T> requires(has_mpi_type<T>)
+  template <typename T>
+    requires(has_mpi_type<T>)
   void mpi_reduce_in_place(T &x, communicator c = {}, int root = 0, bool all = false, MPI_Op op = MPI_SUM) {
     if (!all)
       MPI_Reduce((c.rank() == root ? MPI_IN_PLACE : &x), &x, 1, mpi_type<T>::get(), op, root, c.get());

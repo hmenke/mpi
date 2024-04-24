@@ -33,7 +33,7 @@ struct custom_cplx {
   }
 
   // default equal-to operator
-  bool operator==(const custom_cplx&) const = default;
+  bool operator==(const custom_cplx &) const = default;
 };
 
 // tie the data (used to construct the custom MPI type)
@@ -131,25 +131,19 @@ TEST(MPI, TupleMPIDatatypes) {
   // check custom MPI datatypes of various tuple types
   using type1 = std::tuple<int>;
   type1 tup1;
-  if (rank == root) {
-      tup1 = std::make_tuple(100);
-  }
+  if (rank == root) { tup1 = std::make_tuple(100); }
   mpi::broadcast(tup1, world, root);
   EXPECT_EQ(tup1, std::make_tuple(100));
 
   using type2 = std::tuple<int, double>;
   type2 tup2;
-  if (rank == root) {
-      tup2 = std::make_tuple(100, 3.1314);
-  }
+  if (rank == root) { tup2 = std::make_tuple(100, 3.1314); }
   mpi::broadcast(tup2, world, root);
   EXPECT_EQ(tup2, std::make_tuple(100, 3.1314));
 
   using type5 = std::tuple<int, double, char, custom_cplx, bool>;
   type5 tup5;
-  if (rank == root) {
-      tup5 = std::make_tuple(100, 3.1314, 'r', custom_cplx{1.0, 2.0}, false);
-  }
+  if (rank == root) { tup5 = std::make_tuple(100, 3.1314, 'r', custom_cplx{1.0, 2.0}, false); }
   mpi::broadcast(tup5, world, root);
   EXPECT_EQ(tup5, std::make_tuple(100, 3.1314, 'r', custom_cplx{1.0, 2.0}, false));
 }
