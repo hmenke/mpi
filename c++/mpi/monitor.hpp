@@ -255,7 +255,7 @@ namespace mpi {
     // that is true if at least one non-root process has not performed its MPI_Isend call yet.
     bool root_check_nodes_and_bcast() {
       EXPECTS(!finalized);
-      EXPECTS(comm.rank() == root);
+      EXPECTS(comm.rank() == 0);
       bool any      = false;
       bool all      = true;
       bool finished = true;
