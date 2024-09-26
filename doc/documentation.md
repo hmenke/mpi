@@ -33,6 +33,7 @@ Furthermore, it offers tools to simplify the creation of custom MPI operations u
 
 The following generic collective communications are defined in @ref coll_comm "Collective MPI communication":
 
+* @ref mpi::all_equal "all_equal"
 * @ref mpi::all_gather "all_gather"
 * @ref mpi::all_reduce "all_reduce"
 * @ref mpi::all_reduce_in_place "all_reduce_in_place"

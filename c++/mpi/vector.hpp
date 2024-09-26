@@ -52,14 +52,6 @@ namespace mpi {
       using type = typename T::regular_type;
     };
 
-    // Check if a vector is of the same size on all processes.
-    template <typename T> bool same_size(std::vector<T> const &v, communicator c) {
-      auto size     = v.size();
-      auto max_size = mpi::all_reduce(size, c, MPI_MAX);
-      auto min_size = mpi::all_reduce(size, c, MPI_MIN);
-      return min_size == max_size;
-    }
-
   } // namespace detail
 
   /**
@@ -114,7 +106,7 @@ namespace mpi {
    */
   template <typename T> void mpi_reduce_in_place(std::vector<T> &v, communicator c = {}, int root = 0, bool all = false, MPI_Op op = MPI_SUM) {
     // check the sizes of all vectors
-    if (!detail::same_size(v, c)) throw std::runtime_error{"mpi_reduce_in_place for vectors only works with vectors of the same size\n"};
+    if (!all_equal(v.size(), c)) throw std::runtime_error{"mpi_reduce_in_place for vectors only works with vectors of the same size\n"};
     if (v.size() == 0) return;
 
     if constexpr (has_mpi_type<T>) {
@@ -149,7 +141,7 @@ namespace mpi {
   template <typename T>
   std::vector<regular_t<T>> mpi_reduce(std::vector<T> const &v, communicator c = {}, int root = 0, bool all = false, MPI_Op op = MPI_SUM) {
     // check the size of all vectors
-    if (!detail::same_size(v, c)) throw std::runtime_error{"mpi_reduce for vectors only works with vectors of the same size\n"};
+    if (!all_equal(v.size(), c)) throw std::runtime_error{"mpi_reduce for vectors only works with vectors of the same size\n"};
     if (v.size() == 0) return {};
 
     // perform the reduction for every element of the vector

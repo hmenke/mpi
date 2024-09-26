@@ -269,6 +269,29 @@ namespace mpi {
       check_mpi_call(MPI_Allreduce(MPI_IN_PLACE, &x, 1, mpi_type<T>::get(), op, c.get()), "MPI_Allreduce");
   }
 
+  /**
+   * @brief Checks if a given object is equal across all ranks in the given communicator.
+   *
+   * @details It requires that there is a specialized `mpi_reduce` for the given type `T` and that it is equality
+   * comparable as well as default constructible.
+   *
+   * It makes two calls to simplemc::mpi::all_reduce, one with `MPI_MIN` and the other with `MPI_MAX`, and compares
+   * their results.
+   *
+   * @note `MPI_MIN` and `MPI_MAX` need to make sense for the given type `T`.
+   *
+   * @tparam T Type to be checked.
+   * @param x Object to be equality compared.
+   * @param c mpi::communicator.
+   * @return If the given object is equal on all ranks, it returns true. Otherwise, it returns false.
+   */
+  template <typename T> bool all_equal(T &&x, communicator c = {}) {
+    if (!has_env) return true;
+    auto min_obj = all_reduce(std::forward<T>(x), c, MPI_MIN);
+    auto max_obj = all_reduce(std::forward<T>(x), c, MPI_MAX);
+    return min_obj == max_obj;
+  }
+
   /** @} */
 
 } // namespace mpi

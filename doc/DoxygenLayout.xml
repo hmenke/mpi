@@ -52,6 +52,7 @@
         <tab type="user" url="@ref mpi::map_add" title="map_add"/>
       </tab>
       <tab type="usergroup" url="@ref coll_comm" title="Collective MPI communication">
+      <tab type="user" url="@ref mpi::all_equal" title="all_equal"/>
         <tab type="user" url="@ref mpi::all_gather" title="all_gather"/>
         <tab type="user" url="@ref mpi::all_reduce" title="all_reduce"/>
         <tab type="user" url="@ref mpi::all_reduce_in_place" title="all_reduce_in_place"/>
