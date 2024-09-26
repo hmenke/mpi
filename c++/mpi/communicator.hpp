@@ -167,7 +167,7 @@ namespace mpi {
      *
      * @param poll_msec The polling interval in milliseconds. If set to 0, a simple `MPI_Barrier` call is used.
      */
-    void barrier(long poll_msec = 1) {
+    void barrier(long poll_msec = 1) const {
       if (has_env) {
         if (poll_msec == 0) {
           MPI_Barrier(_com);
