@@ -89,6 +89,7 @@
       </tab>
       <tab type="usergroup" url="@ref utilities" title="Utilities">
         <tab type="user" url="@ref mpi::regular_t" title="regular_t"/>
+        <tab type="user" url="@ref mpi::check_mpi_call" title="check_mpi_call"/>
         <tab type="user" url="@ref mpi::chunk" title="chunk"/>
         <tab type="user" url="@ref mpi::chunk_length" title="chunk_length"/>
       </tab>

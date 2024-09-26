@@ -22,6 +22,7 @@
 #pragma once
 
 #include "./mpi.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
@@ -77,6 +78,8 @@ namespace mpi {
    * On non-root processes, the vector is always resized to match the size of the vector on the root process. If the
    * root process is empty, no broadcast is performed.
    *
+   * It throws an exception in case a call to the MPI C library fails.
+   *
    * @tparam T Value type of the vector.
    * @param v std::vector to broadcast.
    * @param c mpi::communicator.
@@ -87,7 +90,7 @@ namespace mpi {
     broadcast(s, c, root);
     if (c.rank() != root) v.resize(s);
     if constexpr (has_mpi_type<T>) {
-      if (s != 0) MPI_Bcast(v.data(), v.size(), mpi_type<T>::get(), root, c.get());
+      if (s != 0) check_mpi_call(MPI_Bcast(v.data(), v.size(), mpi_type<T>::get(), root, c.get()), "MPI_Bcast");
     } else {
       for (auto &x : v) broadcast(x, c, root);
     }
@@ -99,7 +102,8 @@ namespace mpi {
    * @details If mpi::has_mpi_type<T> is true then the vector is reduced using a simple `MPI_Reduce` or `MPI_Allreduce`.
    * Otherwise, the specialized `mpi_reduce_in_place` is called for each element of the vector.
    *
-   * It throws an exception if the vectors are not of the same size. If the vectors are empty, it does nothing.
+   * It throws an exception if the vectors are not of the same size or if an MPI call fails. If the vectors are empty,
+   * it does nothing.
    *
    * @tparam T Value type of the vector.
    * @param v std::vector to reduce.
@@ -115,9 +119,10 @@ namespace mpi {
 
     if constexpr (has_mpi_type<T>) {
       if (!all)
-        MPI_Reduce((c.rank() == root ? MPI_IN_PLACE : v.data()), v.data(), v.size(), mpi_type<T>::get(), op, root, c.get());
+        check_mpi_call(MPI_Reduce((c.rank() == root ? MPI_IN_PLACE : v.data()), v.data(), v.size(), mpi_type<T>::get(), op, root, c.get()),
+                       "MPI_Reduce");
       else
-        MPI_Allreduce(MPI_IN_PLACE, v.data(), v.size(), mpi_type<T>::get(), op, c.get());
+        check_mpi_call(MPI_Allreduce(MPI_IN_PLACE, v.data(), v.size(), mpi_type<T>::get(), op, c.get()), "MPI_Allreduce");
     } else {
       for (auto &x : v) mpi_reduce_in_place(v, c, root, all);
     }
@@ -130,7 +135,8 @@ namespace mpi {
    * (in this case, mpi::regular_t<T> has to be the same as T). Otherwise, the generic mpi::reduce is called for each
    * element of the vector.
    *
-   * It throws an exception if the vectors are not of the same size. If the vectors are empty, it does nothing.
+   * It throws an exception if the vectors are not of the same size or if an MPI call fails. If the vectors are empty,
+   * it does nothing.
    *
    * @tparam T Value type of the vector.
    * @param v std::vector to reduce.
@@ -152,9 +158,9 @@ namespace mpi {
       static_assert(std::is_same_v<regular_t<T>, T>, "Internal error");
       std::vector<T> res(s);
       if (!all)
-        MPI_Reduce((void *)v.data(), res.data(), s, mpi_type<T>::get(), op, root, c.get());
+        check_mpi_call(MPI_Reduce((void *)v.data(), res.data(), s, mpi_type<T>::get(), op, root, c.get()), "MPI_Reduce");
       else
-        MPI_Allreduce((void *)v.data(), res.data(), s, mpi_type<T>::get(), op, c.get());
+        check_mpi_call(MPI_Allreduce((void *)v.data(), res.data(), s, mpi_type<T>::get(), op, c.get()), "MPI_Allreduce");
       return res;
     } else {
       std::vector<regular_t<T>> r;
@@ -169,6 +175,8 @@ namespace mpi {
    *
    * @details If mpi::has_mpi_type<T> is true then the vector is scattered as evenly as possible across the processes in
    * the communicator using a simple `MPI_Scatterv`.
+   *
+   * It throws an exception in case a call to the MPI C library fails.
    *
    * @tparam T Value type of the vector.
    * @param v std::vector to scatter.
@@ -195,8 +203,9 @@ namespace mpi {
     // do the scattering
     std::vector<T> res(recvcount);
     if constexpr (has_mpi_type<T>) {
-      MPI_Scatterv((void *)v.data(), &sendcounts[0], &displs[0], mpi_type<T>::get(), (void *)res.data(), recvcount, mpi_type<T>::get(), root,
-                   c.get());
+      check_mpi_call(MPI_Scatterv((void *)v.data(), &sendcounts[0], &displs[0], mpi_type<T>::get(), (void *)res.data(), recvcount, mpi_type<T>::get(),
+                                  root, c.get()),
+                     "MPI_Scatterv");
     } else {
       std::copy(cbegin(v) + displs[c.rank()], cbegin(v) + displs[c.rank() + 1], begin(res));
     }
@@ -210,6 +219,8 @@ namespace mpi {
    * @details If mpi::has_mpi_type<T> is true then the vector is gathered using a simple `MPI_Gatherv` or
    * `MPI_Allgatherv`. Otherwise, each process broadcasts its elements to all other processes which implies that
    * `all == true` is required in this case.
+   *
+   * It throws an exception in case a call to the MPI C library fails.
    *
    * @tparam T Value type of the vector.
    * @param v std::vector to gather.
@@ -230,9 +241,9 @@ namespace mpi {
     auto displs     = std::vector<int>(c.size() + 1, 0); // displacements given in number of elements not in bytes
     int sendcount   = v.size();                          // number of elements sent by the calling process
     if (!all)
-      MPI_Gather(&sendcount, 1, mpi_ty, &recvcounts[0], 1, mpi_ty, root, c.get());
+      check_mpi_call(MPI_Gather(&sendcount, 1, mpi_ty, &recvcounts[0], 1, mpi_ty, root, c.get()), "MPI_Gather");
     else
-      MPI_Allgather(&sendcount, 1, mpi_ty, &recvcounts[0], 1, mpi_ty, c.get());
+      check_mpi_call(MPI_Allgather(&sendcount, 1, mpi_ty, &recvcounts[0], 1, mpi_ty, c.get()), "MPI_Allgather");
 
     for (int r = 0; r < c.size(); ++r) displs[r + 1] = recvcounts[r] + displs[r];
 
@@ -240,10 +251,13 @@ namespace mpi {
     std::vector<T> res((all || (c.rank() == root) ? s : 0));
     if constexpr (has_mpi_type<T>) {
       if (!all)
-        MPI_Gatherv((void *)v.data(), sendcount, mpi_type<T>::get(), (void *)res.data(), &recvcounts[0], &displs[0], mpi_type<T>::get(), root,
-                    c.get());
+        check_mpi_call(MPI_Gatherv((void *)v.data(), sendcount, mpi_type<T>::get(), (void *)res.data(), &recvcounts[0], &displs[0],
+                                   mpi_type<T>::get(), root, c.get()),
+                       "MPI_Gatherv");
       else
-        MPI_Allgatherv((void *)v.data(), sendcount, mpi_type<T>::get(), (void *)res.data(), &recvcounts[0], &displs[0], mpi_type<T>::get(), c.get());
+        check_mpi_call(MPI_Allgatherv((void *)v.data(), sendcount, mpi_type<T>::get(), (void *)res.data(), &recvcounts[0], &displs[0],
+                                      mpi_type<T>::get(), c.get()),
+                       "MPI_Allgatherv");
     } else {
       if (!all)
         throw std::runtime_error{"mpi_gather for custom types only implemented with 'all = true'\n"};

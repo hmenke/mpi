@@ -22,6 +22,7 @@
 #pragma once
 
 #include "./environment.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
@@ -36,6 +37,8 @@ namespace mpi {
    *
    * @details It stores an `MPI_Comm` object as its only member which by default is set to `MPI_COMM_WORLD`.
    * Note that copying the communicator simply copies the `MPI_Comm` object, without calling `MPI_Comm_dup`.
+   *
+   * All functions that make direct calls to the MPI C library throw an exception in case the call fails.
    */
   class communicator {
     // Wrapped `MPI_Comm` object.
@@ -61,7 +64,7 @@ namespace mpi {
     [[nodiscard]] int rank() const {
       if (has_env) {
         int num = 0;
-        MPI_Comm_rank(_com, &num);
+        check_mpi_call(MPI_Comm_rank(_com, &num), "MPI_Comm_rank");
         return num;
       } else
         return 0;
@@ -74,7 +77,7 @@ namespace mpi {
     [[nodiscard]] int size() const {
       if (has_env) {
         int num = 0;
-        MPI_Comm_size(_com, &num);
+        check_mpi_call(MPI_Comm_size(_com, &num), "MPI_Comm_size");
         return num;
       } else
         return 1;
@@ -95,7 +98,7 @@ namespace mpi {
     [[nodiscard]] communicator split(int color, int key = 0) const {
       if (has_env) {
         communicator c;
-        MPI_Comm_split(_com, color, key, &c._com);
+        check_mpi_call(MPI_Comm_split(_com, color, key, &c._com), "MPI_Comm_split");
         return c;
       } else
         return {};
@@ -116,7 +119,7 @@ namespace mpi {
     [[nodiscard]] communicator duplicate() const {
       if (has_env) {
         communicator c;
-        MPI_Comm_dup(_com, &c._com);
+        check_mpi_call(MPI_Comm_dup(_com, &c._com), "MPI_Comm_dup");
         return c;
       } else
         return {};
@@ -132,7 +135,7 @@ namespace mpi {
      * Does nothing, if mpi::has_env is false.
      */
     void free() {
-      if (has_env) { MPI_Comm_free(&_com); }
+      if (has_env) { check_mpi_call(MPI_Comm_free(&_com), "MPI_Comm_free"); }
     }
 
     /**
@@ -141,7 +144,7 @@ namespace mpi {
      */
     void abort(int error_code) const {
       if (has_env)
-        MPI_Abort(_com, error_code);
+        check_mpi_call(MPI_Abort(_com, error_code), "MPI_Abort");
       else
         std::abort();
     }
@@ -170,13 +173,13 @@ namespace mpi {
     void barrier(long poll_msec = 1) const {
       if (has_env) {
         if (poll_msec == 0) {
-          MPI_Barrier(_com);
+          check_mpi_call(MPI_Barrier(_com), "MPI_Barrier");
         } else {
           MPI_Request req{};
           int flag = 0;
-          MPI_Ibarrier(_com, &req);
+          check_mpi_call(MPI_Ibarrier(_com, &req), "MPI_Ibarrier");
           while (!flag) {
-            MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+            check_mpi_call(MPI_Test(&req, &flag, MPI_STATUS_IGNORE), "MPI_Test");
             usleep(poll_msec * 1000);
           }
         }

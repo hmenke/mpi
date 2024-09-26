@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include "./utils.hpp"
+
 #include <mpi.h>
 
 #include <algorithm>
@@ -98,6 +100,8 @@ namespace mpi {
    * @details The tuple element types must have corresponding MPI datatypes, i.e. they must have mpi::mpi_type
    * specializtions. It uses `MPI_Type_create_struct` to create a new datatype consisting of the tuple element types.
    *
+   * It throws an exception in case a call to the MPI C library fails.
+   *
    * @tparam Ts Tuple element types.
    * @param tup Tuple object.
    * @return `MPI_Datatype` consisting of the types of the tuple elements.
@@ -122,8 +126,8 @@ namespace mpi {
 
     // create and return MPI datatype
     MPI_Datatype cty{};
-    MPI_Type_create_struct(N, blocklen.data(), disp.data(), types.data(), &cty);
-    MPI_Type_commit(&cty);
+    check_mpi_call(MPI_Type_create_struct(N, blocklen.data(), disp.data(), types.data(), &cty), "MPI_Type_create_struct");
+    check_mpi_call(MPI_Type_commit(&cty), "MPI_Type_commit");
     return cty;
   }
 

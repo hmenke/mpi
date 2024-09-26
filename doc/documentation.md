@@ -82,5 +82,6 @@ processes.
 The following utilities are defined in **mpi**:
 
 * @ref mpi::regular_t "regular_t"
+* @ref mpi::check_mpi_call "check_mpi_call"
 * @ref mpi::chunk "chunk"
 * @ref mpi::chunk_length "chunk_length"

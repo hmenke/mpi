@@ -23,6 +23,7 @@
 
 #include "./macros.hpp"
 #include "./mpi.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
@@ -46,6 +47,8 @@ namespace mpi {
    *
    * It uses a duplicate communicator to not interfere with other MPI communications. The communicator is freed in the
    * `finalize_communications` function (which is called in the destructor if not called before).
+   *
+   * All functions that make direct calls to the MPI C library throw an exception in case the call fails.
    */
   class monitor {
     // Future struct for non-blocking MPI communication.
@@ -102,11 +105,12 @@ namespace mpi {
       if (comm.rank() == 0) {
         root_futures.resize(c.size() - 1);
         for (int rank = 1; rank < c.size(); ++rank) {
-          MPI_Irecv(&(root_futures[rank - 1].event), 1, MPI_INT, rank, rank, comm.get(), &(root_futures[rank - 1].request));
+          check_mpi_call(MPI_Irecv(&(root_futures[rank - 1].event), 1, MPI_INT, rank, rank, comm.get(), &(root_futures[rank - 1].request)),
+                         "MPI_Irecv");
         }
       } else {
-        MPI_Ibcast(&any_event, 1, MPI_INT, 0, comm.get(), &req_ibcast_any);
-        MPI_Ibcast(&all_events, 1, MPI_INT, 0, comm.get(), &req_ibcast_all);
+        check_mpi_call(MPI_Ibcast(&any_event, 1, MPI_INT, 0, comm.get(), &req_ibcast_any), "MPI_Ibcast");
+        check_mpi_call(MPI_Ibcast(&all_events, 1, MPI_INT, 0, comm.get(), &req_ibcast_all), "MPI_Ibcast");
       }
     }
 
@@ -141,7 +145,7 @@ namespace mpi {
         root_check_nodes_and_bcast();
       } else {
         // on non-root processes, let the root process know about the local event
-        MPI_Isend(&local_event, 1, MPI_INT, 0, comm.rank(), comm.get(), &req_isent);
+        check_mpi_call(MPI_Isend(&local_event, 1, MPI_INT, 0, comm.rank(), comm.get(), &req_isent), "MPI_Isend");
       }
     }
 
@@ -178,7 +182,7 @@ namespace mpi {
       // occurred
       MPI_Status status;
       int has_received = 0;
-      MPI_Test(&req_ibcast_any, &has_received, &status);
+      check_mpi_call(MPI_Test(&req_ibcast_any, &has_received, &status), "MPI_Test");
       return has_received and any_event;
     }
 
@@ -211,7 +215,7 @@ namespace mpi {
       // processes
       MPI_Status status;
       int has_received = 0;
-      MPI_Test(&req_ibcast_all, &has_received, &status);
+      check_mpi_call(MPI_Test(&req_ibcast_all, &has_received, &status), "MPI_Test");
       return has_received and all_events;
     }
 
@@ -233,17 +237,17 @@ namespace mpi {
           usleep(100); // 100 us (micro seconds)
         }
         // and perform broadcasts in case they have not been done yet
-        if (not any_event) { MPI_Ibcast(&any_event, 1, MPI_INT, 0, comm.get(), &req_ibcast_any); }
-        if (not all_events) { MPI_Ibcast(&all_events, 1, MPI_INT, 0, comm.get(), &req_ibcast_all); }
+        if (not any_event) { check_mpi_call(MPI_Ibcast(&any_event, 1, MPI_INT, 0, comm.get(), &req_ibcast_any), "MPI_Ibcast"); }
+        if (not all_events) { check_mpi_call(MPI_Ibcast(&all_events, 1, MPI_INT, 0, comm.get(), &req_ibcast_all), "MPI_Ibcast"); }
       } else {
         // on non-root processes, perform MPI_Isend call in case it has not been done yet
-        if (not local_event) { MPI_Isend(&local_event, 1, MPI_INT, 0, comm.rank(), comm.get(), &req_isent); }
+        if (not local_event) { check_mpi_call(MPI_Isend(&local_event, 1, MPI_INT, 0, comm.rank(), comm.get(), &req_isent), "MPI_Isend"); }
       }
 
       // all nodes wait for the broadcasts to be completed
       MPI_Status status_any, status_all;
-      MPI_Wait(&req_ibcast_any, &status_any);
-      MPI_Wait(&req_ibcast_all, &status_all);
+      check_mpi_call(MPI_Wait(&req_ibcast_any, &status_any), "MPI_Wait");
+      check_mpi_call(MPI_Wait(&req_ibcast_all, &status_all), "MPI_Wait");
 
       // free the communicator
       comm.free();
@@ -262,18 +266,18 @@ namespace mpi {
       for (auto &[request, rank_event] : root_futures) {
         MPI_Status status;
         int rank_received = 0;
-        MPI_Test(&request, &rank_received, &status);
+        check_mpi_call(MPI_Test(&request, &rank_received, &status), "MPI_Test");
         any |= (rank_received and rank_event);
         all &= (rank_received and rank_event);
         finished &= rank_received;
       }
       if (not any_event and (any or local_event)) {
         any_event = 1;
-        MPI_Ibcast(&any_event, 1, MPI_INT, 0, comm.get(), &req_ibcast_any);
+        check_mpi_call(MPI_Ibcast(&any_event, 1, MPI_INT, 0, comm.get(), &req_ibcast_any), "MPI_Ibcast");
       }
       if (not all_events and all and local_event) {
         all_events = 1;
-        MPI_Ibcast(&all_events, 1, MPI_INT, 0, comm.get(), &req_ibcast_all);
+        check_mpi_call(MPI_Ibcast(&all_events, 1, MPI_INT, 0, comm.get(), &req_ibcast_all), "MPI_Ibcast");
       }
       return not finished;
     }

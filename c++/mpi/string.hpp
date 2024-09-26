@@ -22,6 +22,7 @@
 #pragma once
 
 #include "./mpi.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
@@ -35,6 +36,8 @@ namespace mpi {
    *
    * @details Simply calls `MPI_Bcast` for the underlying C-string.
    *
+   * It throws an exception in case a call to the MPI C library fails.
+   *
    * @param s std::string to broadcast.
    * @param c mpi::communicator.
    * @param root Rank of the root process.
@@ -43,7 +46,7 @@ namespace mpi {
     size_t len = s.size();
     broadcast(len, c, root);
     if (c.rank() != root) s.resize(len);
-    if (len != 0) MPI_Bcast((void *)s.c_str(), static_cast<int>(s.size()), mpi_type<char>::get(), root, c.get());
+    if (len != 0) check_mpi_call(MPI_Bcast((void *)s.c_str(), static_cast<int>(s.size()), mpi_type<char>::get(), root, c.get()), "MPI_Bcast");
   }
 
 } // namespace mpi
