@@ -275,8 +275,7 @@ namespace mpi {
    * @details It requires that there is a specialized `mpi_reduce` for the given type `T` and that it is equality
    * comparable as well as default constructible.
    *
-   * It makes two calls to simplemc::mpi::all_reduce, one with `MPI_MIN` and the other with `MPI_MAX`, and compares
-   * their results.
+   * It makes two calls to mpi::all_reduce, one with `MPI_MIN` and the other with `MPI_MAX`, and compares their results.
    *
    * @note `MPI_MIN` and `MPI_MAX` need to make sense for the given type `T`.
    *
@@ -285,10 +284,10 @@ namespace mpi {
    * @param c mpi::communicator.
    * @return If the given object is equal on all ranks, it returns true. Otherwise, it returns false.
    */
-  template <typename T> bool all_equal(T &&x, communicator c = {}) {
+  template <typename T> bool all_equal(T const &x, communicator c = {}) {
     if (!has_env) return true;
-    auto min_obj = all_reduce(std::forward<T>(x), c, MPI_MIN);
-    auto max_obj = all_reduce(std::forward<T>(x), c, MPI_MAX);
+    auto min_obj = all_reduce(x, c, MPI_MIN);
+    auto max_obj = all_reduce(x, c, MPI_MAX);
     return min_obj == max_obj;
   }
 
