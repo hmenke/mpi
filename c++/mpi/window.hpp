@@ -27,6 +27,8 @@
 
 #include <cassert>
 
+#include <cstring>
+
 namespace mpi {
 
   template <class BaseType> class shared_window;
@@ -51,13 +53,28 @@ namespace mpi {
 
     /// Create a window over an existing local memory buffer
     explicit window(communicator &c, BaseType *base, MPI_Aint size = 0) noexcept {
-      MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &win);
+      if (has_env) {
+        MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &win);
+      } else {
+        this->base = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
+        if (this->base == nullptr) {
+          std::abort(); // failed memory allocation
+        }
+      }
     }
 
     /// Create a window and allocate memory for a local memory buffer
     explicit window(communicator &c, MPI_Aint size = 0) noexcept {
-      void *baseptr = nullptr;
-      MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &win);
+      if (has_env) {
+        void *baseptr = nullptr;
+        MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &win);
+      } else {
+        //needs to be changed
+        base = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
+        if (base == nullptr) {
+          std::abort();// failed memory allocation
+        }
+      }
     }
 
     ~window() { free(); }
@@ -68,43 +85,55 @@ namespace mpi {
     void free() noexcept {
       if (win != MPI_WIN_NULL) {
         MPI_Win_free(&win);
+      } else {
+        std::free(base);
       }
     }
 
     /// Synchronization routine in active target RMA. It opens and closes an access epoch.
     void fence(int assert = 0) const noexcept {
-      MPI_Win_fence(assert, win);
+      if (has_env) {
+        MPI_Win_fence(assert, win);
+      }
     }
 
     /// Complete all outstanding RMA operations at both the origin and the target
     void flush(int rank = -1) const noexcept {
-      if (rank < 0) {
-        MPI_Win_flush_all(win);
-      } else {
-        MPI_Win_flush(rank, win);
+      if (has_env) {
+        if (rank < 0) {
+          MPI_Win_flush_all(win);
+        } else {
+          MPI_Win_flush(rank, win);
+        } 
       }
     }
 
     /// Synchronize the private and public copies of the window
     void sync() const noexcept {
-      MPI_Win_sync(win);
+        if (has_env) {      
+          MPI_Win_sync(win);
+        }
     }
 
     /// Starts an RMA access epoch locking access to a particular or all ranks in the window
     void lock(int rank = -1, int lock_type = MPI_LOCK_SHARED, int assert = 0) const noexcept {
-      if (rank < 0) {
-        MPI_Win_lock_all(assert, win);
-      } else {
-        MPI_Win_lock(lock_type, rank, assert, win);
+      if (has_env) {
+        if (rank < 0) {
+          MPI_Win_lock_all(assert, win);
+        } else {
+          MPI_Win_lock(lock_type, rank, assert, win);
+        }
       }
     }
 
     /// Completes an RMA access epoch started by a call to lock()
     void unlock(int rank = -1) const noexcept {
-      if (rank < 0) {
+      if (has_env) {
+        if (rank < 0) {
         MPI_Win_unlock_all(win);
-      } else {
-        MPI_Win_unlock(rank, win);
+        } else {
+          MPI_Win_unlock(rank, win);
+        }
       }
     }
 
@@ -112,39 +141,99 @@ namespace mpi {
     template <typename TargetType = BaseType, typename OriginType>
     std::enable_if_t<has_mpi_type<OriginType> && has_mpi_type<TargetType>, void>
     get(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const noexcept {
-      MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
-      MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-      int target_count_ = target_count < 0 ? origin_count : target_count;
-      MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
-    };
+      if (has_env) {
+        MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
+        MPI_Datatype target_datatype = mpi_type<TargetType>::get();
+        int target_count_ = target_count < 0 ? origin_count : target_count;
+        MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
+      } else {
+        if (sizeof(OriginType) != sizeof(BaseType)) {
+          std::abort();
+        }
+        std::memcpy(origin_addr, base, sizeof(OriginType) * origin_count);
+      }
+    }
 
     /// Store data to a remote memory window.
     template <typename TargetType = BaseType, typename OriginType>
     std::enable_if_t<has_mpi_type<OriginType> && has_mpi_type<TargetType>, void>
     put(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const noexcept {
-      MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
-      MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-      int target_count_ = target_count < 0 ? origin_count : target_count;
-      MPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
-    };
+      if (has_env) {
+        MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
+        MPI_Datatype target_datatype = mpi_type<TargetType>::get();
+        int target_count_ = target_count < 0 ? origin_count : target_count;
+        MPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
+      } else {
+        if (sizeof(OriginType) != sizeof(BaseType)) {
+          std::abort(); 
+        }
+        std::memcpy(base + target_disp, origin_addr, sizeof(OriginType) * origin_count);
+      }
+    }
 
     /// Accumulate data into target process through remote memory access.
     template <typename TargetType = BaseType, typename OriginType>
     std::enable_if_t<has_mpi_type<OriginType> && has_mpi_type<TargetType>, void>
     accumulate(OriginType const *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1, MPI_Op op = MPI_SUM) const noexcept {
-      MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
-      MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-      int target_count_ = target_count < 0 ? origin_count : target_count;
-      MPI_Accumulate(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, op, win);
+      if (has_env) {
+        MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
+        MPI_Datatype target_datatype = mpi_type<TargetType>::get();
+        int target_count_ = target_count < 0 ? origin_count : target_count;
+        MPI_Accumulate(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, op, win);
+      } else {
+        if (sizeof(OriginType) != sizeof(BaseType)) {
+          std::abort(); 
+        } 
+
+        switch (op) {
+          case MPI_SUM:
+            for (int i = 0; i < origin_count; ++i) 
+              base[target_disp + i] += origin_addr[i];
+            }
+            break;
+
+          case MPI_PROD:
+            for (int i = 0; i < origin_count; ++i) {
+               base[target_disp + i] *= origin_addr[i];   
+            }
+            break;
+
+          case MPI_MIN:
+
+            for (int i = 0; i < origin_count; ++i) {
+              base[target_disp + i] = std::min(base[target_disp + i], origin_addr[i]);
+            }
+            break;
+          case MPI_MAX:
+
+            for (int i = 0; i < origin_count; ++i) {
+              base[target_disp + i] = std::max(base[target_disp + i], origin_addr[i]);
+            }
+            break;
+
+          default:
+              std::abort(); 
+      }
     }
 
     /// Obtains the value of a window attribute.
     void* get_attr(int win_keyval) const noexcept {
-      int flag;
-      void *attribute_val;
-      MPI_Win_get_attr(win, win_keyval, &attribute_val, &flag);
-      assert(flag);
-      return attribute_val;
+      if (has_env) {
+        int flag;
+        void *attribute_val;
+        MPI_Win_get_attr(win, win_keyval, &attribute_val, &flag);
+        assert(flag);
+        return attribute_val;
+      } else {
+        return nullptr;
+      }
+    }
+
+    /// Set the value of a window attribute.
+    void set_attr(int win_keyval, void* attribute_val) {
+      if (has_env) {
+        MPI_Win_set_attr(win, win_keyval, attribute_val);
+      }
     }
 
     // Expose some commonly used attributes
@@ -161,17 +250,28 @@ namespace mpi {
 
     /// Create a window and allocate memory for a shared memory buffer
     explicit shared_window(shared_communicator& c, MPI_Aint size) noexcept {
-      void* baseptr = nullptr;
-      MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &(this->win));
+      if (has_env) {
+        void* baseptr = nullptr;
+        MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &(this->win));
+      } else {
+        base = (BaseType*) std::malloc(size * sizeof(BaseType));
+        if (base == nullptr) {
+          std::abort();
+        }
+      }
     }
 
     /// Query a shared memory window
     std::tuple<MPI_Aint, int, void*> query(int rank = MPI_PROC_NULL) const noexcept {
-      MPI_Aint size = 0;
-      int disp_unit = 0;
-      void *baseptr = nullptr;
-      MPI_Win_shared_query(this->win, rank, &size, &disp_unit, &baseptr);
-      return {size, disp_unit, baseptr};
+      if (has_env) {
+        MPI_Aint size = 0;
+        int disp_unit = 0;
+        void *baseptr = nullptr;
+        MPI_Win_shared_query(this->win, rank, &size, &disp_unit, &baseptr);
+        return {size, disp_unit, baseptr};
+      } else {
+        return {sizeof(BaseType), sizeof(BaseType), base};
+      }
     }
 
     // Override the commonly used attributes of the window base class
