@@ -38,6 +38,7 @@ namespace mpi {
   class window {
     friend class shared_window<BaseType>;
     MPI_Win win{MPI_WIN_NULL};
+    BaseType* base_local{nullptr};
   public:
     window() = default;
     window(window const&) = delete;
@@ -56,8 +57,8 @@ namespace mpi {
       if (has_env) {
         MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &win);
       } else {
-        this->base = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
-        if (this->base == nullptr) {
+        base_local = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
+        if (base_local == nullptr) {
           std::abort(); // failed memory allocation
         }
       }
@@ -70,8 +71,8 @@ namespace mpi {
         MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &win);
       } else {
         //needs to be changed
-        base = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
-        if (base == nullptr) {
+        base_local = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
+        if (base_local == nullptr) {
           std::abort();// failed memory allocation
         }
       }
@@ -86,7 +87,7 @@ namespace mpi {
       if (win != MPI_WIN_NULL) {
         MPI_Win_free(&win);
       } else {
-        std::free(base);
+        std::free(base_local);
       }
     }
 
@@ -150,7 +151,7 @@ namespace mpi {
         if (sizeof(OriginType) != sizeof(BaseType)) {
           std::abort();
         }
-        std::memcpy(origin_addr, base, sizeof(OriginType) * origin_count);
+        std::memcpy(origin_addr, base_local, sizeof(OriginType) * origin_count);
       }
     }
 
@@ -167,7 +168,7 @@ namespace mpi {
         if (sizeof(OriginType) != sizeof(BaseType)) {
           std::abort(); 
         }
-        std::memcpy(base + target_disp, origin_addr, sizeof(OriginType) * origin_count);
+        std::memcpy(base_local + target_disp, origin_addr, sizeof(OriginType) * origin_count);
       }
     }
 
@@ -188,26 +189,27 @@ namespace mpi {
         switch (op) {
           case MPI_SUM:
             for (int i = 0; i < origin_count; ++i) {
-              base[target_disp + i] += origin_addr[i];
+              base_local[target_disp + i] += origin_addr[i];
             }
             break;
           case MPI_PROD:
             for (int i = 0; i < origin_count; ++i) {
-               base[target_disp + i] *= origin_addr[i];   
+               base_local[target_disp + i] *= origin_addr[i];   
             }
             break;
           case MPI_MIN:
             for (int i = 0; i < origin_count; ++i) {
-              base[target_disp + i] = std::min(base[target_disp + i], origin_addr[i]);
+              base_local[target_disp + i] = std::min(base_local[target_disp + i], origin_addr[i]);
             }
             break;
           case MPI_MAX:
             for (int i = 0; i < origin_count; ++i) {
-              base[target_disp + i] = std::max(base[target_disp + i], origin_addr[i]);
+              base_local[target_disp + i] = std::max(base_local[target_disp + i], origin_addr[i]);
             }
             break;
           default:
               std::abort(); 
+        }
       }
     }
 
@@ -249,8 +251,8 @@ namespace mpi {
         void* baseptr = nullptr;
         MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &(this->win));
       } else {
-        base = (BaseType*) std::malloc(size * sizeof(BaseType));
-        if (base == nullptr) {
+        this->base_local = (BaseType*) std::malloc(size * sizeof(BaseType));
+        if (this->base_local == nullptr) {
           std::abort();
         }
       }
@@ -265,7 +267,7 @@ namespace mpi {
         MPI_Win_shared_query(this->win, rank, &size, &disp_unit, &baseptr);
         return {size, disp_unit, baseptr};
       } else {
-        return {sizeof(BaseType), sizeof(BaseType), base};
+        return {sizeof(BaseType), sizeof(BaseType), this->base_local};
       }
     }
 
@@ -275,4 +277,4 @@ namespace mpi {
     int disp_unit(int rank = MPI_PROC_NULL) const noexcept { return std::get<1>(query(rank)); }
   };
 
-}
+};
