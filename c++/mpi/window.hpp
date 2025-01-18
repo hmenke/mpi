@@ -187,30 +187,25 @@ namespace mpi {
 
         switch (op) {
           case MPI_SUM:
-            for (int i = 0; i < origin_count; ++i) 
+            for (int i = 0; i < origin_count; ++i) {
               base[target_disp + i] += origin_addr[i];
             }
             break;
-
           case MPI_PROD:
             for (int i = 0; i < origin_count; ++i) {
                base[target_disp + i] *= origin_addr[i];   
             }
             break;
-
           case MPI_MIN:
-
             for (int i = 0; i < origin_count; ++i) {
               base[target_disp + i] = std::min(base[target_disp + i], origin_addr[i]);
             }
             break;
           case MPI_MAX:
-
             for (int i = 0; i < origin_count; ++i) {
               base[target_disp + i] = std::max(base[target_disp + i], origin_addr[i]);
             }
             break;
-
           default:
               std::abort(); 
       }
