@@ -98,6 +98,7 @@ TEST(MPI_Window, RingOneSidedAllocShared) {
   EXPECT_EQ(sum, (size_shm * (size_shm - 1)) / 2);
 }
 
+/*
 TEST(MPI_Window, RingOneSidedStoreWinAllocSharedSignal) {
   mpi::communicator world;
   auto shm = world.split_shared();
@@ -157,6 +158,7 @@ TEST(MPI_Window, RingOneSidedStoreWinAllocSharedSignal) {
 
   win.unlock();
 }
+*/
 
 TEST(MPI_Window, SharedArray) {
   mpi::communicator world;

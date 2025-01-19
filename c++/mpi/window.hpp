@@ -39,6 +39,7 @@ namespace mpi {
     friend class shared_window<BaseType>;
     MPI_Win win{MPI_WIN_NULL};
     BaseType* base_local{nullptr};
+    bool is_local{false};
   public:
     window() = default;
     window(window const&) = delete;
@@ -57,9 +58,14 @@ namespace mpi {
       if (has_env) {
         MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &win);
       } else {
-        base_local = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
+        base_local = base;
+
         if (base_local == nullptr) {
-          std::abort(); // failed memory allocation
+          std::abort(); // Provided Buffer is NULL
+        }
+
+        if (reinterpret_cast<std::uintptr_t>(base_local) % alignof(BaseType) != 0) {
+            std::abort(); // Alignment issue
         }
       }
     }
@@ -70,7 +76,11 @@ namespace mpi {
         void *baseptr = nullptr;
         MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &win);
       } else {
-        //needs to be changed
+        is_local = true;
+        if (!size) {
+          base_local = nullptr;
+          return;
+        }
         base_local = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
         if (base_local == nullptr) {
           std::abort();// failed memory allocation
@@ -87,7 +97,10 @@ namespace mpi {
       if (win != MPI_WIN_NULL) {
         MPI_Win_free(&win);
       } else {
-        std::free(base_local);
+        if (is_local) {
+          std::free(base_local);
+          base_local = nullptr;
+        }
       }
     }
 
@@ -142,16 +155,17 @@ namespace mpi {
     template <typename TargetType = BaseType, typename OriginType>
     std::enable_if_t<has_mpi_type<OriginType> && has_mpi_type<TargetType>, void>
     get(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const noexcept {
+      int target_count_ = target_count < 0 ? origin_count : target_count;
       if (has_env) {
         MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
         MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-        int target_count_ = target_count < 0 ? origin_count : target_count;
         MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
       } else {
-        if (sizeof(OriginType) != sizeof(BaseType)) {
-          std::abort();
+        if ((sizeof(OriginType) * origin_count) >= (sizeof(TargetType) * target_count_)) {
+          std::memcpy(origin_addr, base_local + target_disp, sizeof(TargetType) * target_count_);
+        } else {
+          std::abort(); // Not enough memory
         }
-        std::memcpy(origin_addr, base_local, sizeof(OriginType) * origin_count);
       }
     }
 
@@ -159,16 +173,20 @@ namespace mpi {
     template <typename TargetType = BaseType, typename OriginType>
     std::enable_if_t<has_mpi_type<OriginType> && has_mpi_type<TargetType>, void>
     put(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const noexcept {
+      int target_count_ = target_count < 0 ? origin_count : target_count;
       if (has_env) {
         MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
         MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-        int target_count_ = target_count < 0 ? origin_count : target_count;
         MPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
       } else {
-        if (sizeof(OriginType) != sizeof(BaseType)) {
-          std::abort(); 
+        if (origin_count == 0 || target_count == 0) {
+          return;
         }
-        std::memcpy(base_local + target_disp, origin_addr, sizeof(OriginType) * origin_count);
+        if ((sizeof(OriginType) * origin_count) <= (sizeof(TargetType) * target_count_)) {
+          std::memcpy(reinterpret_cast<char*>(base_local) + target_disp * sizeof(TargetType),origin_addr, sizeof(TargetType) * target_count_);
+        } else {
+          std::abort();
+        }
       }
     }
 
@@ -251,10 +269,16 @@ namespace mpi {
         void* baseptr = nullptr;
         MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &(this->win));
       } else {
-        this->base_local = (BaseType*) std::malloc(size * sizeof(BaseType));
-        if (this->base_local == nullptr) {
-          std::abort();
+        this->is_local = true;
+        if (!size) {
+          this->base_local = nullptr;
+          return;
         }
+        this->base_local = (BaseType*) std::aligned_alloc(alignof(BaseType), size * sizeof(BaseType));
+        if (this->base_local == nullptr) {
+          std::abort();// failed memory allocation
+        }
+        allocated_size = size;
       }
     }
 
@@ -267,7 +291,7 @@ namespace mpi {
         MPI_Win_shared_query(this->win, rank, &size, &disp_unit, &baseptr);
         return {size, disp_unit, baseptr};
       } else {
-        return {sizeof(BaseType), sizeof(BaseType), this->base_local};
+        return {allocated_size*sizeof(BaseType), sizeof(BaseType), this->base_local};
       }
     }
 
@@ -275,6 +299,9 @@ namespace mpi {
     BaseType* base(int rank = MPI_PROC_NULL) const noexcept { return static_cast<BaseType*>(std::get<2>(query(rank))); }
     MPI_Aint size(int rank = MPI_PROC_NULL) const noexcept { return std::get<0>(query(rank)) / sizeof(BaseType); }
     int disp_unit(int rank = MPI_PROC_NULL) const noexcept { return std::get<1>(query(rank)); }
+  
+  private:
+    MPI_Aint allocated_size{0};
   };
 
 };
