@@ -202,12 +202,12 @@ namespace mpi {
       } else {
         if (sizeof(OriginType) != sizeof(BaseType)) {
           std::abort(); 
-        } 
+        }
 
         switch (op) {
           case MPI_SUM:
             for (int i = 0; i < origin_count; ++i) {
-              base_local[target_disp + i] += origin_addr[i];
+                base_local[target_disp + i] += origin_addr[i];
             }
             break;
           case MPI_PROD:
@@ -217,18 +217,19 @@ namespace mpi {
             break;
           case MPI_MIN:
             for (int i = 0; i < origin_count; ++i) {
-              base_local[target_disp + i] = std::min(base_local[target_disp + i], origin_addr[i]);
+                base_local[target_disp + i] = std::min(base_local[target_disp + i], origin_addr[i]);
             }
             break;
           case MPI_MAX:
             for (int i = 0; i < origin_count; ++i) {
-              base_local[target_disp + i] = std::max(base_local[target_disp + i], origin_addr[i]);
+                base_local[target_disp + i] = std::max(base_local[target_disp + i], origin_addr[i]);
             }
             break;
           default:
-              std::abort(); 
+            std::cerr << "Error: Unsupported operation." << std::endl;
+            std::abort(); 
+          }
         }
-      }
     }
 
     /// Obtains the value of a window attribute.

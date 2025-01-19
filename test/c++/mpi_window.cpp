@@ -75,6 +75,23 @@ TEST(MPI_Window, RingOneSidedPut) {
   EXPECT_EQ(sum, (size * (size - 1)) / 2);
 }
 
+TEST(MPI_Window, Accumulate) {
+  mpi::communicator world;
+  int const rank = world.rank();
+  int const size = world.size();
+  
+  int value, sum{0};
+
+  mpi::window<int> win{world, &sum, 1};
+  value = rank;
+
+  win.fence();
+  win.accumulate(&value, 1, 0, 0, 1, MPI_SUM);
+  win.fence();
+
+  EXPECT_EQ(sum, (size * (size - 1)) / 2);
+}
+
 TEST(MPI_Window, RingOneSidedAllocShared) {
   mpi::communicator world;
   auto shm = world.split_shared();
