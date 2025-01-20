@@ -54,16 +54,14 @@ namespace mpi {
     }
 
     /// Create a window over an existing local memory buffer
-    explicit window(communicator &c, BaseType *base, MPI_Aint size = 0) noexcept {
+    explicit window(communicator &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
       if (has_env) {
-        MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &win);
+        MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), info, c.get(), &win);
       } else {
         base_local = base;
-
         if (base_local == nullptr) {
           std::abort(); // Provided Buffer is NULL
         }
-
         if (reinterpret_cast<std::uintptr_t>(base_local) % alignof(BaseType) != 0) {
             std::abort(); // Alignment issue
         }
@@ -71,13 +69,13 @@ namespace mpi {
     }
 
     /// Create a window and allocate memory for a local memory buffer
-    explicit window(communicator &c, MPI_Aint size = 0) noexcept {
+    explicit window(communicator &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
       if (has_env) {
         void *baseptr = nullptr;
-        MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &win);
+        MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), info, c.get(), &baseptr, &win);
       } else {
         is_local = true;
-        if (!size) {
+        if (!size || size < 0) {
           base_local = nullptr;
           return;
         }
@@ -124,9 +122,9 @@ namespace mpi {
 
     /// Synchronize the private and public copies of the window
     void sync() const noexcept {
-        if (has_env) {      
-          MPI_Win_sync(win);
-        }
+      if (has_env) {      
+        MPI_Win_sync(win);
+      }
     }
 
     /// Starts an RMA access epoch locking access to a particular or all ranks in the window
@@ -144,7 +142,7 @@ namespace mpi {
     void unlock(int rank = -1) const noexcept {
       if (has_env) {
         if (rank < 0) {
-        MPI_Win_unlock_all(win);
+          MPI_Win_unlock_all(win);
         } else {
           MPI_Win_unlock(rank, win);
         }
@@ -183,7 +181,7 @@ namespace mpi {
           return;
         }
         if ((sizeof(OriginType) * origin_count) <= (sizeof(TargetType) * target_count_)) {
-          std::memcpy(reinterpret_cast<char*>(base_local) + target_disp * sizeof(TargetType),origin_addr, sizeof(TargetType) * target_count_);
+          std::memcpy(reinterpret_cast<char*>(base_local) + target_disp * sizeof(TargetType),origin_addr, sizeof(TargetType) * target_count_); // Insure correct allignment
         } else {
           std::abort();
         }
@@ -200,10 +198,6 @@ namespace mpi {
         int target_count_ = target_count < 0 ? origin_count : target_count;
         MPI_Accumulate(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, op, win);
       } else {
-        if (sizeof(OriginType) != sizeof(BaseType)) {
-          std::abort(); 
-        }
-
         switch (op) {
           case MPI_SUM:
             for (int i = 0; i < origin_count; ++i) {
@@ -228,8 +222,8 @@ namespace mpi {
           default:
             std::cerr << "Error: Unsupported operation." << std::endl;
             std::abort(); 
-          }
         }
+      }
     }
 
     /// Obtains the value of a window attribute.
@@ -265,10 +259,10 @@ namespace mpi {
     shared_window() = default;
 
     /// Create a window and allocate memory for a shared memory buffer
-    explicit shared_window(shared_communicator& c, MPI_Aint size) noexcept {
+    explicit shared_window(shared_communicator& c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
       if (has_env) {
         void* baseptr = nullptr;
-        MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), MPI_INFO_NULL, c.get(), &baseptr, &(this->win));
+        MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), info, c.get(), &baseptr, &(this->win));
       } else {
         this->is_local = true;
         if (!size) {

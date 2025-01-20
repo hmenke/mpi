@@ -85,11 +85,13 @@ TEST(MPI_Window, Accumulate) {
   mpi::window<int> win{world, &sum, 1};
   value = rank;
 
-  win.fence();
-  win.accumulate(&value, 1, 0, 0, 1, MPI_SUM);
+  win.fence(); // if deleted can cause synchronization problems
+  win.accumulate(&value, 1, 0); 
   win.fence();
 
-  EXPECT_EQ(sum, (size * (size - 1)) / 2);
+  if (rank == 0) {
+    EXPECT_EQ(sum, (size * (size - 1)) / 2);
+  } 
 }
 
 TEST(MPI_Window, RingOneSidedAllocShared) {
@@ -115,8 +117,8 @@ TEST(MPI_Window, RingOneSidedAllocShared) {
   EXPECT_EQ(sum, (size_shm * (size_shm - 1)) / 2);
 }
 
-/*
 TEST(MPI_Window, RingOneSidedStoreWinAllocSharedSignal) {
+  if (mpi::has_env) {
   mpi::communicator world;
   auto shm = world.split_shared();
 
@@ -174,8 +176,8 @@ TEST(MPI_Window, RingOneSidedStoreWinAllocSharedSignal) {
   EXPECT_EQ(sum, (size_shm * (size_shm - 1)) / 2);
 
   win.unlock();
+  }
 }
-*/
 
 TEST(MPI_Window, SharedArray) {
   mpi::communicator world;
