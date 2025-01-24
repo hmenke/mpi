@@ -31,6 +31,37 @@ TEST(MPI_Window, SharedCommunicator) {
   [[maybe_unused]] auto shm = world.split_shared();
 }
 
+TEST(MPI_Window, MoveConstructor) {
+  mpi::communicator world;
+  int i = 1;
+  mpi::window<int> win1{world, &i, 1};
+
+  mpi::window<int> win2 = std::move(win1);
+
+  EXPECT_EQ(win1.base(), nullptr);
+// TODO: What does happen? What should happen?
+}
+
+TEST(MPI_Window, Nullptr) {
+  mpi::communicator world;
+  mpi::window<int> win{world, nullptr, 0};
+  // TODO: What does happen? What should happen?
+}
+
+TEST(MPI_Window, NegativeSizeExistingBuffer) {
+  mpi::communicator world;
+  int i = 1;
+  mpi::window<int> win{world, &i, -42};
+  // TODO: What does happen? What should happen?
+}
+
+TEST(MPI_Window, NegativeSizeAllocatedBuffer) {
+  mpi::communicator world;
+  int i = 1;
+  mpi::window<int> win{world, -42};
+  // TODO: What does happen? What should happen?
+}
+
 TEST(MPI_Window, RingOneSidedGet) {
   mpi::communicator world;
   int const rank = world.rank();

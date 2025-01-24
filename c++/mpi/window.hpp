@@ -208,9 +208,27 @@ namespace mpi {
     }
 
     // Expose some commonly used attributes
-    BaseType* base() const noexcept { return static_cast<BaseType*>(get_attr(MPI_WIN_BASE)); }
-    MPI_Aint size() const noexcept { return *static_cast<MPI_Aint*>(get_attr(MPI_WIN_SIZE)); }
-    int disp_unit() const noexcept { return *static_cast<int*>(get_attr(MPI_WIN_DISP_UNIT)); }
+    BaseType* base() const noexcept {
+      if (has_env) {
+        return static_cast<BaseType*>(get_attr(MPI_WIN_BASE));
+      } else {
+        return data.data();
+      }
+    }
+    MPI_Aint size() const noexcept {
+      if (has_env) {
+        return *static_cast<MPI_Aint*>(get_attr(MPI_WIN_SIZE));
+      } else {
+        return data.size();
+      }
+    }
+    int disp_unit() const noexcept {
+      if (has_env) {
+        return *static_cast<int*>(get_attr(MPI_WIN_DISP_UNIT));
+      } else {
+        return sizeof(BaseType);
+      }
+    }
   };
 
   /// The shared_window class
