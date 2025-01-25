@@ -38,6 +38,7 @@ TEST(MPI_Window, MoveConstructor) {
 
   mpi::window<int> win2 = std::move(win1);
 
+  EXPECT_EQ(win2.base(), &i);
   EXPECT_EQ(win1.base(), nullptr);
 // TODO: What does happen? What should happen?
 }
@@ -48,19 +49,36 @@ TEST(MPI_Window, Nullptr) {
   // TODO: What does happen? What should happen?
 }
 
+
 TEST(MPI_Window, NegativeSizeExistingBuffer) {
   mpi::communicator world;
   int i = 1;
   mpi::window<int> win{world, &i, -42};
+
+  // TODO: Check why this only works in mpi env
+  if (mpi::has_env) {
+    EXPECT_NE(static_cast<MPI_Win>(win), MPI_WIN_NULL);
+  }
+  EXPECT_TRUE(win.data.empty());
+  EXPECT_EQ(win.data.size(), 0);
+
+  EXPECT_EQ(i, 1);
+
   // TODO: What does happen? What should happen?
 }
 
 TEST(MPI_Window, NegativeSizeAllocatedBuffer) {
   mpi::communicator world;
-  int i = 1;
   mpi::window<int> win{world, -42};
+
+  if (mpi::has_env) {
+    EXPECT_NE(static_cast<MPI_Win>(win), MPI_WIN_NULL);
+  }
+  EXPECT_TRUE(win.data.empty());
+  EXPECT_EQ(win.data.size(), 0);
   // TODO: What does happen? What should happen?
 }
+
 
 TEST(MPI_Window, RingOneSidedGet) {
   mpi::communicator world;

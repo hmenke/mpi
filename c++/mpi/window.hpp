@@ -44,7 +44,9 @@ namespace mpi {
 
     window() = default;
     window(window const&) = delete;
-    window(window &&other) noexcept : win{std::exchange(other.win, MPI_WIN_NULL)}, data{} {}
+    window(window &&other) noexcept : win{std::exchange(other.win, MPI_WIN_NULL)}, 
+                                      is_owned{std::exchange(other.is_owned, true)}, 
+                                      data{std::exchange(other.data, std::span<BaseType>())} {}
     window& operator=(window const&) = delete;
     window& operator=(window &&rhs) noexcept {
       if (this != std::addressof(rhs)) {
@@ -55,9 +57,12 @@ namespace mpi {
       }
       return *this;
     }
+    // MOVE CONSTRUCTOR NOT WORKING FOR NON MPI ENV
+
 
     /// Create a window over an existing local memory buffer
-    explicit window(communicator &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
+    explicit window(communicator &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) {
+      size = size < 0 ? 0 : size;
       if (has_env) {
         MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), info, c.get(), &win);
       } else {
@@ -68,6 +73,7 @@ namespace mpi {
 
     /// Create a window and allocate memory for a local memory buffer
     explicit window(communicator &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
+      size = size < 0 ? 0 : size;
       if (has_env) {
         void *baseptr = nullptr;
         MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), info, c.get(), &baseptr, &win);
@@ -91,8 +97,8 @@ namespace mpi {
       } else {
         if (is_owned) {
           delete[] data.data();
-          data = std::span<BaseType>();
         }
+        data = std::span<BaseType>();
       }
     }
 
@@ -153,6 +159,7 @@ namespace mpi {
         MPI_Datatype target_datatype = mpi_type<TargetType>::get();
         MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
       } else {
+        // What would happen if target_disp is negative
         if (target_rank != 0) {
           return;
         }
@@ -162,6 +169,7 @@ namespace mpi {
         std::advance(target_begin, target_disp);
         auto target_end = target_begin;
         std::advance(target_end, target_count_);
+        // std::copy does not handle size mismatches -> check ?
         std::copy(target_begin, target_end, origin.begin());
       }
     }
@@ -210,6 +218,9 @@ namespace mpi {
     // Expose some commonly used attributes
     BaseType* base() const noexcept {
       if (has_env) {
+        if (win == MPI_WIN_NULL) {
+          return nullptr;
+        }
         return static_cast<BaseType*>(get_attr(MPI_WIN_BASE));
       } else {
         return data.data();
@@ -239,6 +250,7 @@ namespace mpi {
 
     /// Create a window and allocate memory for a shared memory buffer
     explicit shared_window(shared_communicator& c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
+      size = size < 0 ? 0 : size; // Mention that negative size are turned to 0
       if (has_env) {
         void* baseptr = nullptr;
         MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), info, c.get(), &baseptr, &(this->win));
@@ -263,9 +275,28 @@ namespace mpi {
     }
 
     // Override the commonly used attributes of the window base class
-    BaseType* base(int rank = MPI_PROC_NULL) const noexcept { return static_cast<BaseType*>(std::get<2>(query(rank))); }
-    MPI_Aint size(int rank = MPI_PROC_NULL) const noexcept { return std::get<0>(query(rank)) / sizeof(BaseType); }
-    int disp_unit(int rank = MPI_PROC_NULL) const noexcept { return std::get<1>(query(rank)); }
+    BaseType* base(int rank = MPI_PROC_NULL) const noexcept { 
+      if (has_env) {
+        return static_cast<BaseType*>(std::get<2>(query(rank))); 
+      } else {
+        return this->data.data();
+      }
+      
+    }
+    MPI_Aint size(int rank = MPI_PROC_NULL) const noexcept {
+      if (has_env) {
+        return std::get<0>(query(rank)) / sizeof(BaseType); 
+      } else {
+        return this->data.size();
+      }
+    }
+    int disp_unit(int rank = MPI_PROC_NULL) const noexcept { 
+      if (has_env) {
+        return std::get<1>(query(rank)); 
+      } else {
+        return sizeof(BaseType);
+      }
+    }
   };
 
 };
