@@ -41,12 +41,16 @@ namespace mpi {
     bool is_owned{true};
   public:
     std::span<BaseType> data;
+    MPI_Aint size_byte;
+    int disp_unit_;
 
     window() = default;
     window(window const&) = delete;
     window(window &&other) noexcept : win{std::exchange(other.win, MPI_WIN_NULL)}, 
                                       is_owned{std::exchange(other.is_owned, true)}, 
-                                      data{std::exchange(other.data, std::span<BaseType>())} {}
+                                      data{std::exchange(other.data, std::span<BaseType>())},
+                                      size_byte{std::exchange(other.size_byte, MPI_Aint{0})},
+                                      disp_unit_{std::exchange(other.disp_unit_, 0)} {}
     window& operator=(window const&) = delete;
     window& operator=(window &&rhs) noexcept {
       if (this != std::addressof(rhs)) {
@@ -54,6 +58,8 @@ namespace mpi {
         this->win = std::exchange(rhs.win, MPI_WIN_NULL);
         this->data = std::exchange(rhs.data, std::span<BaseType>());
         this->is_owned = std::exchange(rhs.is_owned, true);
+        this->size_byte = std::exchange(rhs.size_byte, MPI_Aint{0});
+        this-> disp_unit_ = std::exchange(rhs.disp_unit_, 0);
       }
       return *this;
     }
@@ -63,8 +69,10 @@ namespace mpi {
     /// Create a window over an existing local memory buffer
     explicit window(communicator &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) {
       size = size < 0 ? 0 : size;
+      disp_unit_ = sizeof(BaseType);
+      size_byte = size < 0 ? 0 : (size * disp_unit_);
       if (has_env) {
-        MPI_Win_create(base, size * sizeof(BaseType), alignof(BaseType), info, c.get(), &win);
+        MPI_Win_create(base, size_byte, disp_unit_, info, c.get(), &win); 
       } else {
         is_owned = false;
         data = std::span<BaseType>(base, size);
@@ -74,9 +82,11 @@ namespace mpi {
     /// Create a window and allocate memory for a local memory buffer
     explicit window(communicator &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
       size = size < 0 ? 0 : size;
+      disp_unit_ = sizeof(BaseType);
+      size_byte = size < 0 ? 0 : (size * disp_unit_);
       if (has_env) {
         void *baseptr = nullptr;
-        MPI_Win_allocate(size * sizeof(BaseType), alignof(BaseType), info, c.get(), &baseptr, &win);
+        MPI_Win_allocate(size_byte, disp_unit_, info, c.get(), &baseptr, &win);
       } else {
         is_owned = true;
         BaseType* p = new BaseType[size];
@@ -99,6 +109,8 @@ namespace mpi {
           delete[] data.data();
         }
         data = std::span<BaseType>();
+        size_byte = 0;
+        disp_unit_ = 0;
       }
     }
 
@@ -204,14 +216,14 @@ namespace mpi {
         assert(flag);
         return attribute_val;
       } else {
+        if (win_keyval == MPI_WIN_BASE) {
+          return data.data();
+        } else if (win_keyval == MPI_WIN_SIZE) {
+          return const_cast<void*>(static_cast<const void*>(&size_byte)); // 
+        } else if (win_keyval == MPI_WIN_DISP_UNIT) {
+          return const_cast<void*>(static_cast<const void*>(&disp_unit_)); 
+        }
         return nullptr;
-      }
-    }
-
-    /// Set the value of a window attribute.
-    void set_attr(int win_keyval, void* attribute_val) {
-      if (has_env) {
-        MPI_Win_set_attr(win, win_keyval, attribute_val);
       }
     }
 
@@ -250,10 +262,12 @@ namespace mpi {
 
     /// Create a window and allocate memory for a shared memory buffer
     explicit shared_window(shared_communicator& c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
-      size = size < 0 ? 0 : size; // Mention that negative size are turned to 0
+      size = size < 0 ? 0 : size;
+      this->disp_unit_ = sizeof(BaseType);
+      this->size_byte = size < 0 ? 0 : (size * this->disp_unit_); // Mention that negative size are turned to 0
       if (has_env) {
         void* baseptr = nullptr;
-        MPI_Win_allocate_shared(size * sizeof(BaseType), alignof(BaseType), info, c.get(), &baseptr, &(this->win));
+        MPI_Win_allocate_shared(this->size_byte, this->disp_unit_, info, c.get(), &baseptr, &(this->win));
       } else {
         this->is_owned = true;
         BaseType* p = new BaseType[size];

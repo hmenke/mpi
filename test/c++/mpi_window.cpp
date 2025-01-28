@@ -31,6 +31,30 @@ TEST(MPI_Window, SharedCommunicator) {
   [[maybe_unused]] auto shm = world.split_shared();
 }
 
+/// Extrz Tests To finish
+TEST(MPI_Window, GetAttrBase) {
+  mpi::communicator world;
+  int rank = world.rank();
+
+  int buffer = rank;
+  mpi::window<int> win{world, &buffer, 1};
+
+  void* base_ptr = win.get_attr(MPI_WIN_BASE);
+  EXPECT_NE(base_ptr, nullptr); 
+  EXPECT_EQ(base_ptr, &buffer); 
+}
+
+TEST(MPI_Window, GetAttrSize) {
+  mpi::communicator world;
+  int buffer;
+  mpi::window<int> win{world, &buffer, 1};
+
+
+  void* size_ptr = win.get_attr(MPI_WIN_SIZE);
+  EXPECT_NE(size_ptr, nullptr);
+  EXPECT_EQ(*static_cast<MPI_Aint*>(size_ptr), sizeof(int)); 
+}
+
 TEST(MPI_Window, MoveConstructor) {
   mpi::communicator world;
   int i = 1;
