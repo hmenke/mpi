@@ -38,9 +38,9 @@ TEST(MPI_Window, GetAttrBase) {
   int buffer = rank;
   mpi::window<int> win{world, &buffer, 1};
 
-  void* base_ptr = win.get_attr(MPI_WIN_BASE);
-  EXPECT_NE(base_ptr, nullptr); 
-  EXPECT_EQ(base_ptr, &buffer); 
+  void* base_ptr = win.base();
+  EXPECT_NE(base_ptr, nullptr);
+  EXPECT_EQ(base_ptr, &buffer);
 }
 
 TEST(MPI_Window, GetAttrSize) {
@@ -49,9 +49,8 @@ TEST(MPI_Window, GetAttrSize) {
   mpi::window<int> win{world, &buffer, 1};
 
 
-  void* size_ptr = win.get_attr(MPI_WIN_SIZE);
-  EXPECT_NE(size_ptr, nullptr);
-  EXPECT_EQ(*static_cast<MPI_Aint*>(size_ptr), sizeof(int)); 
+  MPI_Aint size = win.size();
+  EXPECT_EQ(size, sizeof(int));
 }
 
 TEST(MPI_Window, MoveConstructor) {
@@ -69,48 +68,41 @@ TEST(MPI_Window, NullptrSizeZero) {
   mpi::communicator world;
   mpi::window<int> win{world, nullptr, 0};
 
-  EXPECT_TRUE(win.data.empty());
-  EXPECT_EQ(win.data.size(), 0);
+  EXPECT_TRUE(win.data().empty());
+  EXPECT_EQ(win.data().size(), 0);
 }
 
-/*
-TEST(MPI_Window, NullptrSizeNotZero) {
+TEST(MPI_Window, OneSidedGet) {
   mpi::communicator world;
-  EXPECT_DEATH(
-      {
-        mpi::window<int> win{world, nullptr, 42};
-      },
-      ".*"
-    );
+  int const rank = world.rank();
+  int const size = world.size();
+
+  int snd_buf, rcv_buf = -1;
+  mpi::window<int> win{world, &snd_buf, 1};
+  snd_buf = rank;
+
+  win.fence();
+  win.get(&rcv_buf, 1, rank);
+  win.fence();
+
+  EXPECT_EQ(rcv_buf, rank);
 }
-*/
 
-
-TEST(MPI_Window, NegativeSizeExistingBuffer) {
+TEST(MPI_Window, OneSidedPut) {
   mpi::communicator world;
-  int i = 1;
-  mpi::window<int> win{world, &i, -42};
+  int const rank = world.rank();
+  int const size = world.size();
 
-  if (mpi::has_env) {
-    EXPECT_NE(static_cast<MPI_Win>(win), MPI_WIN_NULL);
-  }
-  EXPECT_TRUE(win.data.empty());
-  EXPECT_EQ(win.data.size(), 0);
+  int snd_buf, rcv_buf = -1;
+  mpi::window<int> win{world, &rcv_buf, 1};
+  snd_buf = rank;
 
-  EXPECT_EQ(i, 1);
+  win.fence();
+  win.put(&snd_buf, 1, rank);
+  win.fence();
+
+  EXPECT_EQ(rcv_buf, rank);
 }
-
-TEST(MPI_Window, NegativeSizeAllocatedBuffer) {
-  mpi::communicator world;
-  mpi::window<int> win{world, -42};
-
-  if (mpi::has_env) {
-    EXPECT_NE(static_cast<MPI_Win>(win), MPI_WIN_NULL);
-  }
-  EXPECT_TRUE(win.data.empty());
-  EXPECT_EQ(win.data.size(), 0);
-}
-
 
 TEST(MPI_Window, RingOneSidedGet) {
   mpi::communicator world;
