@@ -31,7 +31,6 @@ TEST(MPI_Window, SharedCommunicator) {
   [[maybe_unused]] auto shm = world.split_shared();
 }
 
-/// Extrz Tests To finish
 TEST(MPI_Window, GetAttrBase) {
   mpi::communicator world;
   int rank = world.rank();
@@ -64,14 +63,27 @@ TEST(MPI_Window, MoveConstructor) {
 
   EXPECT_EQ(win2.base(), &i);
   EXPECT_EQ(win1.base(), nullptr);
-// TODO: What does happen? What should happen?
 }
 
-TEST(MPI_Window, Nullptr) {
+TEST(MPI_Window, NullptrSizeZero) {
   mpi::communicator world;
   mpi::window<int> win{world, nullptr, 0};
-  // TODO: What does happen? What should happen?
+
+  EXPECT_TRUE(win.data.empty());
+  EXPECT_EQ(win.data.size(), 0);
 }
+
+/*
+TEST(MPI_Window, NullptrSizeNotZero) {
+  mpi::communicator world;
+  EXPECT_DEATH(
+      {
+        mpi::window<int> win{world, nullptr, 42};
+      },
+      ".*"
+    );
+}
+*/
 
 
 TEST(MPI_Window, NegativeSizeExistingBuffer) {
@@ -79,7 +91,6 @@ TEST(MPI_Window, NegativeSizeExistingBuffer) {
   int i = 1;
   mpi::window<int> win{world, &i, -42};
 
-  // TODO: Check why this only works in mpi env
   if (mpi::has_env) {
     EXPECT_NE(static_cast<MPI_Win>(win), MPI_WIN_NULL);
   }
@@ -87,8 +98,6 @@ TEST(MPI_Window, NegativeSizeExistingBuffer) {
   EXPECT_EQ(win.data.size(), 0);
 
   EXPECT_EQ(i, 1);
-
-  // TODO: What does happen? What should happen?
 }
 
 TEST(MPI_Window, NegativeSizeAllocatedBuffer) {
@@ -100,7 +109,6 @@ TEST(MPI_Window, NegativeSizeAllocatedBuffer) {
   }
   EXPECT_TRUE(win.data.empty());
   EXPECT_EQ(win.data.size(), 0);
-  // TODO: What does happen? What should happen?
 }
 
 

@@ -63,14 +63,15 @@ namespace mpi {
       }
       return *this;
     }
-    // MOVE CONSTRUCTOR NOT WORKING FOR NON MPI ENV
-
 
     /// Create a window over an existing local memory buffer
     explicit window(communicator &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) {
+      if (base == nullptr && size != 0) { 
+        std::abort(); // Undefined Behavior with Nullptr and non zero size
+      }
       size = size < 0 ? 0 : size;
       disp_unit_ = sizeof(BaseType);
-      size_byte = size < 0 ? 0 : (size * disp_unit_);
+      size_byte = (size * disp_unit_);
       if (has_env) {
         MPI_Win_create(base, size_byte, disp_unit_, info, c.get(), &win); 
       } else {
@@ -83,7 +84,7 @@ namespace mpi {
     explicit window(communicator &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
       size = size < 0 ? 0 : size;
       disp_unit_ = sizeof(BaseType);
-      size_byte = size < 0 ? 0 : (size * disp_unit_);
+      size_byte = (size * disp_unit_);
       if (has_env) {
         void *baseptr = nullptr;
         MPI_Win_allocate(size_byte, disp_unit_, info, c.get(), &baseptr, &win);
@@ -181,7 +182,6 @@ namespace mpi {
         std::advance(target_begin, target_disp);
         auto target_end = target_begin;
         std::advance(target_end, target_count_);
-        // std::copy does not handle size mismatches -> check ?
         std::copy(target_begin, target_end, origin.begin());
       }
     }
@@ -219,10 +219,10 @@ namespace mpi {
         if (win_keyval == MPI_WIN_BASE) {
           return data.data();
         } else if (win_keyval == MPI_WIN_SIZE) {
-          return const_cast<void*>(static_cast<const void*>(&size_byte)); // 
+          return const_cast<void*>(static_cast<const void*>(&size_byte)); 
         } else if (win_keyval == MPI_WIN_DISP_UNIT) {
           return const_cast<void*>(static_cast<const void*>(&disp_unit_)); 
-        }
+        } // CREATE_FLAVOR ,MODEL , LOCK_FREE
         return nullptr;
       }
     }
@@ -240,16 +240,16 @@ namespace mpi {
     }
     MPI_Aint size() const noexcept {
       if (has_env) {
-        return *static_cast<MPI_Aint*>(get_attr(MPI_WIN_SIZE));
+        return *static_cast<MPI_Aint*>(get_attr(MPI_WIN_SIZE)); // Size in bytes
       } else {
-        return data.size();
+        return data.size(); // Number of elements in the span (should be mentioned?)
       }
     }
     int disp_unit() const noexcept {
       if (has_env) {
         return *static_cast<int*>(get_attr(MPI_WIN_DISP_UNIT));
       } else {
-        return sizeof(BaseType);
+        return disp_unit_;
       }
     }
   };
@@ -264,7 +264,7 @@ namespace mpi {
     explicit shared_window(shared_communicator& c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
       size = size < 0 ? 0 : size;
       this->disp_unit_ = sizeof(BaseType);
-      this->size_byte = size < 0 ? 0 : (size * this->disp_unit_); // Mention that negative size are turned to 0
+      this->size_byte = (size * this->disp_unit_); // Mention that negative size are turned to 0
       if (has_env) {
         void* baseptr = nullptr;
         MPI_Win_allocate_shared(this->size_byte, this->disp_unit_, info, c.get(), &baseptr, &(this->win));
