@@ -43,6 +43,92 @@ TEST(MPI_Window, GetAttrBase) {
   EXPECT_EQ(base_ptr, &buffer);
 }
 
+TEST(MPI_Window, WindowAllocate) {
+  mpi::communicator world;
+  int rank = world.rank();
+
+  mpi::window<int> win{world, 1};
+  *(win.base()) = rank;
+
+  win.fence();
+  int rcv;
+  win.get(&rcv, 1, rank);
+  win.fence();
+
+  EXPECT_EQ(rcv, rank); 
+} 
+
+TEST(MPI_Window, LockUnlock) {
+  mpi::communicator world;
+  int rank = world.rank();
+
+  mpi::window<int> win{world, 1};
+
+  *(win.base()) = 0;
+
+  if (rank == 0) {
+    int val = 42;
+    win.lock(MPI_LOCK_EXCLUSIVE, 1);
+    win.put(&val, 1, 1);
+    win.unlock(1);
+  }
+
+  win.fence();
+  if (rank == 1) {
+    EXPECT_EQ(*(win.base()), 42);
+  }
+}
+
+TEST(MPI_Window, RoyalFlush) {
+  mpi::communicator world;
+  int rank = world.rank();
+  int size = world.size();
+
+  int* buf;
+  mpi::window<int> win{world, 1};
+
+  buf = win.base();
+
+  int next = (rank + 1) % size;
+  int val = rank;
+
+  win.lock(next); // DOES NOT WORK WITH MPI_LOCK_EXCLUSIVE
+  win.put(&val, 1, next);
+  win.flush(next);
+  win.unlock(next);
+
+  win.fence();
+
+  if (rank == (size - 1) && mpi::has_env) {
+    EXPECT_EQ(*buf, size - 2); 
+  }
+}
+
+TEST(MPI_Window, ExclusiveLockFlush) {
+  mpi::communicator world;
+  int rank = world.rank();
+  int size = world.size();
+
+  int* buf;
+  mpi::window<int> win{world, 1};
+
+  buf = win.base();
+
+  int next = (rank + 1) % size;
+  int val = rank;
+
+  win.lock(MPI_LOCK_EXCLUSIVE, next); // DOES NOT WORK WITH MPI_LOCK_EXCLUSIVE
+  win.put(&val, 1, next);
+  win.flush(next);
+  win.unlock(next);
+
+  win.fence();
+
+  if (rank == (size - 1) && mpi::has_env) {
+    EXPECT_EQ(*buf, size - 2); 
+  }
+}
+
 TEST(MPI_Window, GetAttrSize) {
   mpi::communicator world;
   int buffer;
@@ -75,7 +161,6 @@ TEST(MPI_Window, NullptrSizeZero) {
 TEST(MPI_Window, OneSidedGet) {
   mpi::communicator world;
   int const rank = world.rank();
-  int const size = world.size();
 
   int snd_buf, rcv_buf = -1;
   mpi::window<int> win{world, &snd_buf, 1};
@@ -91,7 +176,6 @@ TEST(MPI_Window, OneSidedGet) {
 TEST(MPI_Window, OneSidedPut) {
   mpi::communicator world;
   int const rank = world.rank();
-  int const size = world.size();
 
   int snd_buf, rcv_buf = -1;
   mpi::window<int> win{world, &rcv_buf, 1};
