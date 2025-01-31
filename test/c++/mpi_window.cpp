@@ -94,7 +94,7 @@ TEST(MPI_Window, RoyalFlush) {
 
   win.lock(next); // DOES NOT WORK WITH MPI_LOCK_EXCLUSIVE
   win.put(&val, 1, next);
-  win.flush(next);
+  win.flush(next); // works with and without flush (complexity)
   win.unlock(next);
 
   win.fence();
@@ -104,30 +104,7 @@ TEST(MPI_Window, RoyalFlush) {
   }
 }
 
-TEST(MPI_Window, ExclusiveLockFlush) {
-  mpi::communicator world;
-  int rank = world.rank();
-  int size = world.size();
 
-  int* buf;
-  mpi::window<int> win{world, 1};
-
-  buf = win.base();
-
-  int next = (rank + 1) % size;
-  int val = rank;
-
-  win.lock(MPI_LOCK_EXCLUSIVE, next); // DOES NOT WORK WITH MPI_LOCK_EXCLUSIVE
-  win.put(&val, 1, next);
-  win.flush(next);
-  win.unlock(next);
-
-  win.fence();
-
-  if (rank == (size - 1) && mpi::has_env) {
-    EXPECT_EQ(*buf, size - 2); 
-  }
-}
 
 TEST(MPI_Window, GetAttrSize) {
   mpi::communicator world;

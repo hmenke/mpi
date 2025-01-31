@@ -80,7 +80,7 @@ namespace mpi {
     * @param c The MPI communicator that defines the group of processes sharing the window.
     * @param base Pointer to the base address of the memory buffer.
     * @param size The number of elements of type `BaseType` in the buffer set to 0 if not defined.
-    * @param info Additional MPI information (default: `MPI_INFO_NULL`).
+    * @param info Additional MPI information.
     */
 
     explicit window(communicator &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) {
@@ -105,7 +105,7 @@ namespace mpi {
     *
     * @param c The MPI communicator that defines the group of processes sharing the window.
     * @param size The number of elements of type `BaseType` to allocate.
-    * @param info Additional MPI information (default: `MPI_INFO_NULL`).
+    * @param info Additional MPI information.
     */
     explicit window(communicator &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
       ASSERT(size >= 0)
@@ -135,7 +135,6 @@ namespace mpi {
       if (has_env) {
         if (win != MPI_WIN_NULL) {
           MPI_Win_free(&win);
-          // Mention data is only freed in non MPI env
         }
       } else {
         if (is_owned) {
@@ -151,7 +150,7 @@ namespace mpi {
     * @details This function acts as a barrier for remote memory access (RMA) operations,
     *          ensuring all previous operations on the window are completed before continuing.
     *
-    * @param assert An assertion flag that provides optimization hints to MPI (default: 0).
+    * @param assert program assertion.
     */
     void fence(int assert = 0) const noexcept {
       if (has_env) {
@@ -196,9 +195,9 @@ namespace mpi {
     *          preventing concurrent modifications. This enables fine-grained control 
     *          over remote memory access operations.
     *
-    * @param rank The rank to lock access for. If negative, locks all ranks (default: -1).
+    * @param rank The rank to lock access for.
     * @param lock_type The type of lock (e.g., `MPI_LOCK_SHARED` or `MPI_LOCK_EXCLUSIVE`).
-    * @param assert An assertion flag providing optimization hints to MPI (default: 0).
+    * @param assert An assertion flag providing optimization hints to MPI.
     */
     void lock(int rank = -1, int lock_type = MPI_LOCK_SHARED, int assert = 0) const noexcept {
       if (has_env) {
@@ -216,7 +215,7 @@ namespace mpi {
     * @details Unlocks access to the memory window for a specific rank or all ranks,
     *          allowing other processes to access or modify the window.
     *
-    * @param rank The rank to unlock access for. If negative, unlocks all ranks (default: -1).
+    * @param rank The rank to unlock access for.
     */
     void unlock(int rank = -1) const noexcept {
       if (has_env) {
@@ -234,13 +233,13 @@ namespace mpi {
     * @details This function retrieves data from a remote process's memory window and 
     *          stores it in the local buffer. It supports different data types via templates.
     *
-    * @tparam `TargetType` The data type at the target memory (defaults to BaseType).
+    * @tparam `TargetType` The data type at the target memory.
     * @tparam `OriginType` The data type at the origin memory.
-    * @param origin_addr Pointer to the local memory buffer where the data will be stored.
+    * @param origin_addr Pointer to the memory buffer where the data will be stored.
     * @param origin_count Number of elements to retrieve.
     * @param target_rank Rank of the target process from which data is fetched.
-    * @param target_disp Displacement (in elements) from the start of the target memory window.
-    * @param target_count Number of elements to read from the target. If negative, defaults to `origin_count`.
+    * @param target_disp Displacement (in `Displacement Unit`) from the start of the target memory window.
+    * @param target_count Number of elements to read from the target. If negative or not specified, defaults to `origin_count`.
     */
     template <typename TargetType = BaseType, typename OriginType>
     requires(has_mpi_type<OriginType> && has_mpi_type<TargetType>)
@@ -251,7 +250,6 @@ namespace mpi {
         MPI_Datatype target_datatype = mpi_type<TargetType>::get();
         MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win);
       } else {
-        // What would happen if target_disp is negative
         if (target_rank != 0) {
           return;
         }
@@ -271,13 +269,13 @@ namespace mpi {
     * @details This function transfers data from a local buffer to a remote process's 
     *          memory window. It supports different data types via templates.
     *
-    * @tparam `TargetType` The data type at the target memory (defaults to BaseType).
+    * @tparam `TargetType` The data type at the target memory.
     * @tparam `OriginType` The data type at the origin memory.
     * @param origin_addr Pointer to the local memory buffer containing the data to be sent.
     * @param origin_count Number of elements to transfer.
     * @param target_rank Rank of the target process to which data is written.
-    * @param target_disp Displacement (in elements) from the start of the target memory window.
-    * @param target_count Number of elements to write to the target. If negative, defaults to `origin_count`.
+    * @param target_disp Displacement (in `Displacement Unit`) from the start of the target memory window.
+    * @param target_count Number of elements to write to the target. If negative or not specified, defaults to `origin_count`.
     */
     template <typename TargetType = BaseType, typename OriginType>
     requires(has_mpi_type<OriginType> && has_mpi_type<TargetType>)
@@ -302,12 +300,10 @@ namespace mpi {
     /**
     * @brief Retrieves the value of a window attribute.
     *
-    * @details This function queries an attribute associated with an MPI window,
-    *          such as memory model or lock type. If the attribute exists, it returns 
-    *          a pointer to its value; otherwise, it returns `nullptr`.
+    * @details This function queries an attribute associated with an MPI window.
     *
     * @param win_keyval The key identifying the attribute.
-    * @return A pointer to the attribute value, or `nullptr` if not found.
+    * @return A pointer to the attribute value.
     */
     void* get_attr(int win_keyval) const noexcept {
       if (has_env) {
@@ -326,10 +322,8 @@ namespace mpi {
     * @brief Retrieves the base address of the memory window.
     *
     * @details This function returns a pointer to the base address of the memory associated with the MPI window.
-    *          If MPI is enabled (`has_env` is true), it queries the `MPI_WIN_BASE` attribute.
-    *          If MPI is not enabled, it returns the base address of the local memory view.
     *
-    * @return A pointer to the base address of the window memory, or `nullptr` if the window is invalid.
+    * @return A pointer to the base address of the window memory.
     */
     BaseType* base() const noexcept {
       if (has_env) {
@@ -346,8 +340,6 @@ namespace mpi {
     * @brief Retrieves the size of the memory window.
     *
     * @details This function returns the total size (in bytes) of the memory associated with the MPI window.
-    *          If MPI is enabled (`has_env` is true), it queries the `MPI_WIN_SIZE` attribute.
-    *          Otherwise, it returns the size of the local view in bytes.
     *
     * @return The size of the MPI window in bytes.
     */
@@ -363,9 +355,7 @@ namespace mpi {
     /**
     * @brief Retrieves the displacement unit of the memory window.
     *
-    * @details The displacement unit determines the scaling factor for address displacements 
-    *          in the MPI window. If MPI is enabled (`has_env` is true), it queries the `MPI_WIN_DISP_UNIT` attribute.
-    *          Otherwise, it returns the size of a single element in the local view.
+    * @details The displacement unit determines the scaling factor for address displacements.
     *
     * @return The displacement unit (in bytes).
     */
@@ -390,8 +380,6 @@ namespace mpi {
   * @brief A shared memory window abstraction using MPI.
   *
   * @details This class provides an interface for creating and managing an MPI shared memory window.
-  *          When MPI is enabled, memory is allocated using `MPI_Win_allocate_shared`. Otherwise,
-  *          a standard dynamic allocation is performed.
   *
   * @tparam BaseType The data type stored in the shared memory window.
   */
@@ -404,12 +392,11 @@ namespace mpi {
     /**
      * @brief Constructs a shared memory window.
      *
-     * @details If MPI is enabled, this constructor allocates shared memory within the given communicator.
-     *          Otherwise, it falls back to a standard dynamic allocation.
+     * @details This constructor allocates shared memory within the given communicator.
      *
      * @param c The shared communicator.
      * @param size The number of elements of type `BaseType` to allocate.
-     * @param info MPI_Info object for optimization hints (defaults to `MPI_INFO_NULL`).
+     * @param info MPI_Info object for optimization hints.
      */
     explicit shared_window(shared_communicator& c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
       ASSERT(size >= 0)
@@ -428,7 +415,6 @@ namespace mpi {
      * @brief Queries attributes of a shared memory window.
      *
      * @details Retrieves the size, displacement unit, and base address of the shared memory region for a given rank.
-     *          In non-MPI mode, it returns attributes of the local `std::span<BaseType>`.
      *
      * @param rank The rank within the communicator (defaults to `MPI_PROC_NULL` for querying all ranks).
      * @return A tuple containing (size in bytes, displacement unit, base pointer).
@@ -450,7 +436,7 @@ namespace mpi {
     /**
      * @brief Returns the base address of the shared memory for a specific rank.
      *
-     * @param rank The rank whose base address should be retrieved (defaults to `MPI_PROC_NULL`).
+     * @param rank The rank whose base address should be retrieved.
      * @return A pointer to the base address.
      */
     BaseType* base(int rank = MPI_PROC_NULL) const noexcept {
@@ -460,7 +446,7 @@ namespace mpi {
     /**
      * @brief Returns the number of elements stored in the shared memory window.
      *
-     * @param rank The rank whose memory size should be retrieved (defaults to `MPI_PROC_NULL`).
+     * @param rank The rank whose memory size should be retrieved.
      * @return The number of elements in the shared window.
      */
     MPI_Aint size(int rank = MPI_PROC_NULL) const noexcept {
@@ -470,8 +456,8 @@ namespace mpi {
     /**
      * @brief Returns the displacement unit of the shared memory.
      *
-     * @param rank The rank whose displacement unit should be retrieved (defaults to `MPI_PROC_NULL`).
-     * @return The displacement unit (usually equal to `sizeof(BaseType)`).
+     * @param rank The rank whose displacement unit should be retrieved.
+     * @return The displacement unit.
      */
     int disp_unit(int rank = MPI_PROC_NULL) const noexcept {
       return std::get<1>(query(rank));
