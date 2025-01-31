@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include "./utils.hpp"
+
 #include <mpi.h>
 
 #include <algorithm>
@@ -98,6 +100,8 @@ namespace mpi {
    * @details The tuple element types must have corresponding MPI datatypes, i.e. they must have mpi::mpi_type
    * specializtions. It uses `MPI_Type_create_struct` to create a new datatype consisting of the tuple element types.
    *
+   * It throws an exception in case a call to the MPI C library fails.
+   *
    * @tparam Ts Tuple element types.
    * @param tup Tuple object.
    * @return `MPI_Datatype` consisting of the types of the tuple elements.
@@ -113,17 +117,17 @@ namespace mpi {
     // displacements of the blocks in bytes w.r.t. to the memory address of the first block
     std::array<MPI_Aint, N> disp;
     // initialize displacement array from the tuple element addresses
-    []<size_t... Is>(std::index_sequence<Is...>, auto &tup, MPI_Aint *disp) {
-      ((disp[Is] = (char *)&std::get<Is>(tup) - (char *)&std::get<0>(tup)), ...);
+    []<size_t... Is>(std::index_sequence<Is...>, auto &t, MPI_Aint *d) {
+      ((d[Is] = (char *)&std::get<Is>(t) - (char *)&std::get<0>(t)), ...);
       // account for non-trivial memory layouts of the tuple elements
-      auto min_el = *std::min_element(disp, disp + sizeof...(Ts));
-      ((disp[Is] -= min_el), ...);
+      auto min_el = *std::min_element(d, d + sizeof...(Ts));
+      ((d[Is] -= min_el), ...);
     }(std::index_sequence_for<Ts...>{}, tup, disp.data());
 
     // create and return MPI datatype
     MPI_Datatype cty{};
-    MPI_Type_create_struct(N, blocklen.data(), disp.data(), types.data(), &cty);
-    MPI_Type_commit(&cty);
+    check_mpi_call(MPI_Type_create_struct(N, blocklen.data(), disp.data(), types.data(), &cty), "MPI_Type_create_struct");
+    check_mpi_call(MPI_Type_commit(&cty), "MPI_Type_commit");
     return cty;
   }
 

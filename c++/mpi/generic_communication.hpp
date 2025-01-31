@@ -16,15 +16,17 @@
 
 /**
  * @file
- * @brief Provides generic implementations for a subset of collective MPI communications (broadcast, reduce, gather, scatter).
- * @details The generic functions (mpi::broadcast, mpi::reduce, mpi::scatter, ...) call their more specialized counterparts
- * (e.g. mpi::mpi_broadcast, mpi::mpi_reduce, mpi::mpi_scatter, ...). They depend on ADL.
+ * @brief Provides generic implementations for a subset of collective MPI communications (broadcast, reduce, gather,
+ * scatter).
+ * @details The generic functions (mpi::broadcast, mpi::reduce, mpi::scatter, ...) call their more specialized
+ * counterparts (e.g. mpi::mpi_broadcast, mpi::mpi_reduce, mpi::mpi_scatter, ...). They depend on ADL.
  */
 
 #pragma once
 
 #include "./datatypes.hpp"
 #include "./lazy.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
@@ -63,17 +65,17 @@ namespace mpi {
   /**
    * @brief Generic MPI broadcast.
    *
-   * @details If mpi::has_env is true, this function calls the specialized `mpi_broadcast` function for the given object,
-   * otherwise it does nothing.
+   * @details If mpi::has_env is true, this function calls the specialized `mpi_broadcast` function for the given
+   * object, otherwise it does nothing.
    *
    * @tparam T Type to be broadcasted.
    * @param x Object to be broadcasted.
    * @param c mpi::communicator.
    * @param root Rank of the root process.
    */
-  template <typename T> [[gnu::always_inline]] void broadcast(T &x, communicator c = {}, int root = 0) {
+  template <typename T> [[gnu::always_inline]] void broadcast(T &&x, communicator c = {}, int root = 0) {
     static_assert(not std::is_const_v<T>, "mpi::broadcast cannot be called on const objects");
-    if (has_env) mpi_broadcast(x, c, root);
+    if (has_env) mpi_broadcast(std::forward<T>(x), c, root);
   }
 
   /**
@@ -108,8 +110,8 @@ namespace mpi {
   /**
    * @brief Generic in-place MPI reduce.
    *
-   * @details If mpi::has_env is true, this functions calls the specialized `mpi_reduce_in_place` function for the given object.
-   * Otherwise, it does nothing.
+   * @details If mpi::has_env is true, this functions calls the specialized `mpi_reduce_in_place` function for the given
+   * object. Otherwise, it does nothing.
    *
    * @tparam T Type to be reduced.
    * @param x Object to be reduced.
@@ -119,17 +121,17 @@ namespace mpi {
    * @param op `MPI_Op` used in the reduction.
    */
   template <typename T>
-  [[gnu::always_inline]] inline void reduce_in_place(T &x, communicator c = {}, int root = 0, bool all = false, MPI_Op op = MPI_SUM) {
+  [[gnu::always_inline]] inline void reduce_in_place(T &&x, communicator c = {}, int root = 0, bool all = false, MPI_Op op = MPI_SUM) {
     static_assert(not std::is_const_v<T>, "In-place mpi functions cannot be called on const objects");
-    if (has_env) mpi_reduce_in_place(x, c, root, all, op);
+    if (has_env) mpi_reduce_in_place(std::forward<T>(x), c, root, all, op);
   }
 
   /**
    * @brief Generic MPI scatter.
    *
    * @details If mpi::has_env is true or if the return type of the specialized `mpi_scatter` is lazy, this function
-   * calls the specialized `mpi_scatter` function for the given object. Otherwise, it simply converts the input
-   * object to the output type `mpi_scatter` would return.
+   * calls the specialized `mpi_scatter` function for the given object. Otherwise, it simply converts the input object
+   * to the output type `mpi_scatter` would return.
    *
    * @tparam T Type to be scattered.
    * @param x Object to be scattered.
@@ -154,8 +156,8 @@ namespace mpi {
    * @brief Generic MPI gather.
    *
    * @details If mpi::has_env is true or if the return type of the specialized `mpi_gather` is lazy, this function
-   * calls the specialized `mpi_gather` function for the given object. Otherwise, it simply converts the input
-   * object to the output type `mpi_gather` would return.
+   * calls the specialized `mpi_gather` function for the given object. Otherwise, it simply converts the input object to
+   * the output type `mpi_gather` would return.
    *
    * @tparam T Type to be gathered.
    * @param x Object to be gathered.
@@ -202,8 +204,10 @@ namespace mpi {
   }
 
   /**
-   * @brief Implementation of an MPI broadcast for types that have a corresponding MPI datatype, i.e. for which
-   * a specialization of mpi::mpi_type has been defined.
+   * @brief Implementation of an MPI broadcast for types that have a corresponding MPI datatype, i.e. for which a
+   * specialization of mpi::mpi_type has been defined.
+   *
+   * @details It throws an exception in case a call to the MPI C library fails.
    *
    * @tparam T Type to be broadcasted.
    * @param x Object to be broadcasted.
@@ -213,12 +217,14 @@ namespace mpi {
   template <typename T>
     requires(has_mpi_type<T>)
   void mpi_broadcast(T &x, communicator c = {}, int root = 0) {
-    MPI_Bcast(&x, 1, mpi_type<T>::get(), root, c.get());
+    check_mpi_call(MPI_Bcast(&x, 1, mpi_type<T>::get(), root, c.get()), "MPI_Bcast");
   }
 
   /**
-   * @brief Implementation of an MPI reduce for types that have a corresponding MPI datatype, i.e. for which
-   * a specialization of mpi::mpi_type has been defined.
+   * @brief Implementation of an MPI reduce for types that have a corresponding MPI datatype, i.e. for which a
+   * specialization of mpi::mpi_type has been defined.
+   *
+   * @details It throws an exception in case a call to the MPI C library fails.
    *
    * @tparam T Type to be reduced.
    * @param x Object to be reduced.
@@ -235,15 +241,17 @@ namespace mpi {
     auto d = mpi_type<T>::get();
     if (!all)
       // old MPI implementations may require a non-const send buffer
-      MPI_Reduce(const_cast<T *>(&x), &b, 1, d, op, root, c.get()); // NOLINT
+      check_mpi_call(MPI_Reduce(const_cast<T *>(&x), &b, 1, d, op, root, c.get()), "MPI_Reduce"); // NOLINT
     else
-      MPI_Allreduce(const_cast<T *>(&x), &b, 1, d, op, c.get()); // NOLINT
+      check_mpi_call(MPI_Allreduce(const_cast<T *>(&x), &b, 1, d, op, c.get()), "MPI_Allreduce"); // NOLINT
     return b;
   }
 
   /**
    * @brief Implementation of an in-place MPI reduce for types that have a corresponding MPI datatype, i.e. for which
    * a specialization of mpi::mpi_type has been defined.
+   *
+   * @details It throws an exception in case a call to the MPI C library fails.
    *
    * @tparam T Type to be reduced.
    * @param x Object to be reduced.
@@ -256,9 +264,31 @@ namespace mpi {
     requires(has_mpi_type<T>)
   void mpi_reduce_in_place(T &x, communicator c = {}, int root = 0, bool all = false, MPI_Op op = MPI_SUM) {
     if (!all)
-      MPI_Reduce((c.rank() == root ? MPI_IN_PLACE : &x), &x, 1, mpi_type<T>::get(), op, root, c.get());
+      check_mpi_call(MPI_Reduce((c.rank() == root ? MPI_IN_PLACE : &x), &x, 1, mpi_type<T>::get(), op, root, c.get()), "MPI_Reduce");
     else
-      MPI_Allreduce(MPI_IN_PLACE, &x, 1, mpi_type<T>::get(), op, c.get());
+      check_mpi_call(MPI_Allreduce(MPI_IN_PLACE, &x, 1, mpi_type<T>::get(), op, c.get()), "MPI_Allreduce");
+  }
+
+  /**
+   * @brief Checks if a given object is equal across all ranks in the given communicator.
+   *
+   * @details It requires that there is a specialized `mpi_reduce` for the given type `T` and that it is equality
+   * comparable as well as default constructible.
+   *
+   * It makes two calls to mpi::all_reduce, one with `MPI_MIN` and the other with `MPI_MAX`, and compares their results.
+   *
+   * @note `MPI_MIN` and `MPI_MAX` need to make sense for the given type `T`.
+   *
+   * @tparam T Type to be checked.
+   * @param x Object to be equality compared.
+   * @param c mpi::communicator.
+   * @return If the given object is equal on all ranks, it returns true. Otherwise, it returns false.
+   */
+  template <typename T> bool all_equal(T const &x, communicator c = {}) {
+    if (!has_env) return true;
+    auto min_obj = all_reduce(x, c, MPI_MIN);
+    auto max_obj = all_reduce(x, c, MPI_MAX);
+    return min_obj == max_obj;
   }
 
   /** @} */
