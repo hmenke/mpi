@@ -126,7 +126,7 @@ namespace mpi {
     * @details If the window owns an allocated memory buffer, it will be automatically freed.
     *          Otherwise, only the MPI window handle is released.
     */
-    ~window() { free(); }
+    virtual ~window() { free(); }
 
     explicit operator MPI_Win() const noexcept { return win; };
     explicit operator MPI_Win*() noexcept { return &win; };
