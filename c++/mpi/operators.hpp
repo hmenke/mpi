@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include "./utils.hpp"
+
 #include <mpi.h>
 
 namespace mpi {
@@ -35,6 +37,8 @@ namespace mpi {
    *
    * @details The binary function must have the following signature `(T const&, T const&) -> T`.
    *
+   * It throws an exception in case a call to the MPI C library fails.
+   *
    * @tparam T Type on which the binary function operates.
    * @tparam F Binary function pointer to be mapped.
    * @return `MPI_Op` created from the binary function.
@@ -46,7 +50,7 @@ namespace mpi {
       auto *inoutT = static_cast<T *>(inout);
       for (int i = 0; i < *len; ++i, ++inT, ++inoutT) { *inoutT = F(*inoutT, *inT); }
     };
-    MPI_Op_create(map_function, true, &myOp);
+    check_mpi_call(MPI_Op_create(map_function, true, &myOp), "MPI_Op_create");
     return myOp;
   }
 

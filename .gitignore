@@ -2,3 +2,5 @@ compile_commands.json
 doc/_autosummary
 doc/cpp2rst_generated
 doc/html
+build/
+_build/

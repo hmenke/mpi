@@ -31,6 +31,140 @@ TEST(MPI_Window, SharedCommunicator) {
   [[maybe_unused]] auto shm = world.split_shared();
 }
 
+TEST(MPI_Window, GetAttrBase) {
+  mpi::communicator world;
+  int rank = world.rank();
+
+  int buffer = rank;
+  mpi::window<int> win{world, &buffer, 1};
+
+  void* base_ptr = win.base();
+  EXPECT_NE(base_ptr, nullptr);
+  EXPECT_EQ(base_ptr, &buffer);
+}
+
+TEST(MPI_Window, WindowAllocate) {
+  mpi::communicator world;
+  int rank = world.rank();
+
+  mpi::window<int> win{world, 1};
+  *(win.base()) = rank;
+
+  win.fence();
+  int rcv;
+  win.get(&rcv, 1, rank);
+  win.fence();
+
+  EXPECT_EQ(rcv, rank); 
+} 
+
+TEST(MPI_Window, LockUnlock) {
+  mpi::communicator world;
+  int rank = world.rank();
+
+  mpi::window<int> win{world, 1};
+
+  *(win.base()) = 0;
+
+  if (rank == 0) {
+    int val = 42;
+    win.lock(MPI_LOCK_EXCLUSIVE, 1);
+    win.put(&val, 1, 1);
+    win.unlock(1);
+  }
+
+  win.fence();
+  if (rank == 1) {
+    EXPECT_EQ(*(win.base()), 42);
+  }
+}
+
+TEST(MPI_Window, RoyalFlush) {
+  mpi::communicator world;
+  int rank = world.rank();
+  int size = world.size();
+
+  int* buf;
+  mpi::window<int> win{world, 1};
+
+  buf = win.base();
+
+  int next = (rank + 1) % size;
+  int val = rank;
+
+  win.lock(next); // DOES NOT WORK WITH MPI_LOCK_EXCLUSIVE
+  win.put(&val, 1, next);
+  win.flush(next); // works with and without flush (complexity)
+  win.unlock(next);
+
+  win.fence();
+
+  if (rank == (size - 1) && mpi::has_env) {
+    EXPECT_EQ(*buf, size - 2); 
+  }
+}
+
+
+
+TEST(MPI_Window, GetAttrSize) {
+  mpi::communicator world;
+  int buffer;
+  mpi::window<int> win{world, &buffer, 1};
+
+
+  MPI_Aint size = win.size();
+  EXPECT_EQ(size, sizeof(int));
+}
+
+TEST(MPI_Window, MoveConstructor) {
+  mpi::communicator world;
+  int i = 1;
+  mpi::window<int> win1{world, &i, 1};
+
+  mpi::window<int> win2 = std::move(win1);
+
+  EXPECT_EQ(win2.base(), &i);
+  EXPECT_EQ(win1.base(), nullptr);
+}
+
+TEST(MPI_Window, NullptrSizeZero) {
+  mpi::communicator world;
+  mpi::window<int> win{world, nullptr, 0};
+
+  EXPECT_TRUE(win.data().empty());
+  EXPECT_EQ(win.data().size(), 0);
+}
+
+TEST(MPI_Window, OneSidedGet) {
+  mpi::communicator world;
+  int const rank = world.rank();
+
+  int snd_buf, rcv_buf = -1;
+  mpi::window<int> win{world, &snd_buf, 1};
+  snd_buf = rank;
+
+  win.fence();
+  win.get(&rcv_buf, 1, rank);
+  win.fence();
+
+  EXPECT_EQ(rcv_buf, rank);
+}
+
+TEST(MPI_Window, OneSidedPut) {
+  mpi::communicator world;
+  int const rank = world.rank();
+
+  int snd_buf, rcv_buf = -1;
+  mpi::window<int> win{world, &rcv_buf, 1};
+  snd_buf = rank;
+
+  win.fence();
+  win.put(&snd_buf, 1, rank);
+  win.fence();
+
+  EXPECT_EQ(rcv_buf, rank);
+}
+
 TEST(MPI_Window, RingOneSidedGet) {
   mpi::communicator world;
   int const rank = world.rank();
@@ -99,6 +233,7 @@ TEST(MPI_Window, RingOneSidedAllocShared) {
 }
 
 TEST(MPI_Window, RingOneSidedStoreWinAllocSharedSignal) {
+  if (mpi::has_env) {
   mpi::communicator world;
   auto shm = world.split_shared();
 
@@ -156,6 +291,7 @@ TEST(MPI_Window, RingOneSidedStoreWinAllocSharedSignal) {
   EXPECT_EQ(sum, (size_shm * (size_shm - 1)) / 2);
 
   win.unlock();
+  }
 }
 
 TEST(MPI_Window, SharedArray) {

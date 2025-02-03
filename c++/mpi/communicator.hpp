@@ -22,6 +22,7 @@
 #pragma once
 
 #include "./environment.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
@@ -38,6 +39,8 @@ namespace mpi {
    *
    * @details It stores an `MPI_Comm` object as its only member which by default is set to `MPI_COMM_WORLD`.
    * Note that copying the communicator simply copies the `MPI_Comm` object, without calling `MPI_Comm_dup`.
+   *
+   * All functions that make direct calls to the MPI C library throw an exception in case the call fails.
    */
   class communicator {
     friend class shared_communicator;
@@ -66,7 +69,7 @@ namespace mpi {
     [[nodiscard]] int rank() const {
       if (has_env) {
         int num = 0;
-        MPI_Comm_rank(_com, &num);
+        check_mpi_call(MPI_Comm_rank(_com, &num), "MPI_Comm_rank");
         return num;
       } else
         return 0;
@@ -79,7 +82,7 @@ namespace mpi {
     [[nodiscard]] int size() const {
       if (has_env) {
         int num = 0;
-        MPI_Comm_size(_com, &num);
+        check_mpi_call(MPI_Comm_size(_com, &num), "MPI_Comm_size");
         return num;
       } else
         return 1;
@@ -91,13 +94,16 @@ namespace mpi {
      * @details Calls `MPI_Comm_split` with the given color and key arguments. See the MPI documentation for more details,
      * e.g. <a href="https://docs.open-mpi.org/en/v5.0.x/man-openmpi/man3/MPI_Comm_split.3.html">open-mpi docs</a>.
      *
+     * @warning This allocates a new communicator object. Make sure to call `free` on the returned communicator when
+     * it is no longer needed.
+     *
      * @return If mpi::has_env is true, return the split `MPI_Comm` object wrapped in a new mpi::communicator, otherwise
      * return a default constructed mpi::communicator.
      */
     [[nodiscard]] communicator split(int color, int key = 0) const {
       if (has_env) {
         communicator c;
-        MPI_Comm_split(_com, color, key, &c._com);
+        check_mpi_call(MPI_Comm_split(_com, color, key, &c._com), "MPI_Comm_split");
         return c;
       } else
         return {};
@@ -106,12 +112,46 @@ namespace mpi {
     [[nodiscard]] shared_communicator split_shared(int split_type = MPI_COMM_TYPE_SHARED, int key = 0) const;
 
     /**
+     * @brief Duplicate the communicator.
+     *
+     * @details Calls `MPI_Comm_dup` to duplicate the communicator. See the MPI documentation for more details, e.g.
+     * <a href="https://docs.open-mpi.org/en/v5.0.x/man-openmpi/man3/MPI_Comm_dup.3.html">open-mpi docs</a>.
+     *
+     * @warning This allocates a new communicator object. Make sure to call `free` on the returned communicator when
+     * it is no longer needed.
+     *
+     * @return If mpi::has_env is true, return the duplicated `MPI_Comm` object wrapped in a new mpi::communicator,
+     * otherwise return a default constructed mpi::communicator.
+     */
+    [[nodiscard]] communicator duplicate() const {
+      if (has_env) {
+        communicator c;
+        check_mpi_call(MPI_Comm_dup(_com, &c._com), "MPI_Comm_dup");
+        return c;
+      } else
+        return {};
+    }
+
+    /**
+     * @brief Free the communicator.
+     *
+     * @details Calls `MPI_Comm_free` to mark the communicator for deallocation. See the MPI documentation for more
+     * details, e.g. <a href="https://docs.open-mpi.org/en/v5.0.x/man-openmpi/man3/MPI_Comm_free.3.html">open-mpi docs
+     * </a>.
+     *
+     * Does nothing, if mpi::has_env is false.
+     */
+    void free() {
+      if (has_env) { check_mpi_call(MPI_Comm_free(&_com), "MPI_Comm_free"); }
+    }
+
+    /**
      * @brief If mpi::has_env is true, `MPI_Abort` is called with the given error code, otherwise std::abort is called.
      * @param error_code The error code to pass to `MPI_Abort`.
      */
-    void abort(int error_code) {
+    void abort(int error_code) const {
       if (has_env)
-        MPI_Abort(_com, error_code);
+        check_mpi_call(MPI_Abort(_com, error_code), "MPI_Abort");
       else
         std::abort();
     }
@@ -137,16 +177,16 @@ namespace mpi {
      *
      * @param poll_msec The polling interval in milliseconds. If set to 0, a simple `MPI_Barrier` call is used.
      */
-    void barrier(long poll_msec = 1) {
+    void barrier(long poll_msec = 1) const {
       if (has_env) {
         if (poll_msec == 0) {
-          MPI_Barrier(_com);
+          check_mpi_call(MPI_Barrier(_com), "MPI_Barrier");
         } else {
           MPI_Request req{};
           int flag = 0;
-          MPI_Ibarrier(_com, &req);
+          check_mpi_call(MPI_Ibarrier(_com, &req), "MPI_Ibarrier");
           while (!flag) {
-            MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+            check_mpi_call(MPI_Test(&req, &flag, MPI_STATUS_IGNORE), "MPI_Test");
             usleep(poll_msec * 1000);
           }
         }
