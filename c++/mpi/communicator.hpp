@@ -194,9 +194,29 @@ namespace mpi {
     }
   };
 
-  /// The shared communicator class
+  /**
+   * @ingroup mpi_osc_shm
+   * @brief C++ wrapper around @p MPI_Comm that is a result of the @p split_shared operation.
+   *
+   * @details In the plain MPI C API it is not distinguishable whether an @p
+   * MPI_Comm is local to a shared memory island or not. Thus we introduce an
+   * extra type for that whose only purpose is to make that distinction on the
+   * type-level to prevent wrong usage of the shared memory APIs.
+   */
   class shared_communicator : public communicator {};
 
+  /**
+   * @brief Partition the communicator into subcommunicators according to their type.
+   *
+   * @details In the MPI3.0 standard the only supported split type is @p
+   * MPI_COMM_TYPE_SHARED. OpenMPI (and possibly other implementations) provide
+   * more custom split types, however, they are not portable.
+   *
+   * @param split_type Type of processes to be grouped together.
+   * @param key Control of rank assignment.
+   *
+   * @return New communicator.
+   */
   [[nodiscard]] inline shared_communicator communicator::split_shared(int split_type, int key) const {
     if (has_env) {
       shared_communicator c;
