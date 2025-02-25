@@ -22,12 +22,14 @@
 #pragma once
 
 #include "./communicator.hpp"
+#include "./datatypes.hpp"
 #include "./group.hpp"
 #include "./macros.hpp"
 
 #include <mpi.h>
 
 #include <span>
+#include <utility>
 
 namespace mpi {
 
