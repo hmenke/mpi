@@ -203,7 +203,12 @@ namespace mpi {
    * extra type for that whose only purpose is to make that distinction on the
    * type-level to prevent wrong usage of the shared memory APIs.
    */
-  class shared_communicator : public communicator {};
+  class shared_communicator : public communicator {
+    public:
+    shared_communicator() { _com = MPI_COMM_NULL; }
+
+    shared_communicator(MPI_Comm c) { _com = c; }
+  };
 
   /**
    * @brief Partition the communicator into subcommunicators according to their type.
