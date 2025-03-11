@@ -88,7 +88,7 @@ namespace mpi {
     * @param size The number of elements of type @p BaseType in the buffer. (default @p 0)
     * @param info Additional MPI information. (default @p MPI_INFO_NULL)
     */
-    explicit window(communicator &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) {
+    explicit window(communicator const &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) {
       ASSERT(size >= 0)
       ASSERT(!(base == nullptr && size > 0))
       if (has_env) {
@@ -112,7 +112,7 @@ namespace mpi {
     * @param size The number of elements of type @p BaseType to allocate. (default @p 0)
     * @param info Additional MPI information. (default @p MPI_INFO_NULL)
     */
-    explicit window(communicator &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
+    explicit window(communicator const &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept {
       ASSERT(size >= 0)
       if (has_env) {
         void *baseptr = nullptr;
@@ -430,7 +430,7 @@ namespace mpi {
      * @param size The number of elements of type @p BaseType to allocate.
      * @param info MPI_Info object for optimization hints.
      */
-    explicit shared_window(shared_communicator &c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
+    explicit shared_window(shared_communicator const &c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
       ASSERT(size >= 0)
       if (has_env) {
         void *baseptr = nullptr;

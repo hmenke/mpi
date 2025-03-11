@@ -205,9 +205,8 @@ namespace mpi {
    */
   class shared_communicator : public communicator {
     public:
-    shared_communicator() { _com = MPI_COMM_NULL; }
-
-    shared_communicator(MPI_Comm c) { _com = c; }
+    using communicator::communicator;
+    shared_communicator() : communicator(MPI_COMM_NULL) {}
   };
 
   /**
