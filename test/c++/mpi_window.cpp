@@ -26,6 +26,30 @@
 // https://fs.hlrs.de/projects/par/par_prog_ws/pdf/mpi_3.1_rab.pdf
 // https://fs.hlrs.de/projects/par/par_prog_ws/practical/MPI31single.tar.gz
 
+TEST(MPI_Window, CommunicatorMember) {
+  mpi::communicator world;
+
+  int data = world.rank();
+
+  mpi::window<int> win(world, &data, 1);
+
+  auto win_comm = win.get_communicator();
+
+  EXPECT_EQ(win_comm.rank(), world.rank());
+  EXPECT_EQ(win_comm.size(), world.size());
+}
+
+TEST(MPI_Window, SharedCommMember) {
+  auto shm = mpi::communicator{}.split_shared();
+
+  mpi::shared_window<int> win{shm, 1};
+
+  auto sh_win_comm = win.get_communicator();
+
+  EXPECT_EQ(sh_win_comm.rank(), shm.rank());
+  EXPECT_EQ(sh_win_comm.size(), shm.size());
+}
+
 TEST(MPI_Window, SharedCommunicator) {
   mpi::communicator world;
   [[maybe_unused]] auto shm = world.split_shared();
@@ -60,6 +84,7 @@ TEST(MPI_Window, WindowAllocate) {
 
 TEST(MPI_Window, PassiveTargetCommunication) {
   mpi::communicator world;
+  if (world.size() < 2) { GTEST_SKIP() << "Test requires at least 2 processes\n"; }
   int rank = world.rank();
 
   auto win_comm = world.split(rank == 0 || rank == 1 ? 0 : MPI_UNDEFINED);
@@ -138,8 +163,8 @@ TEST(MPI_Window, NullptrSizeZero) {
   mpi::communicator world;
   mpi::window<int> win{world, nullptr, 0};
 
-  EXPECT_TRUE(win.data().empty());
-  EXPECT_EQ(win.data().size(), 0);
+  EXPECT_EQ(win.data(), nullptr);
+  EXPECT_EQ(win.size(), 0);
 }
 
 TEST(MPI_Window, OneSidedGet) {
