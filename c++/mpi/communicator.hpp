@@ -43,8 +43,6 @@ namespace mpi {
    * All functions that make direct calls to the MPI C library throw an exception in case the call fails.
    */
   class communicator {
-    friend class shared_communicator;
-
     public:
     /// Construct a communicator with `MPI_COMM_WORLD`.
     communicator() = default;
@@ -65,12 +63,9 @@ namespace mpi {
      * @return The result of `MPI_Comm_rank` if mpi::has_env is true, otherwise 0.
      */
     [[nodiscard]] int rank() const {
-      if (has_env) {
-        int num = 0;
-        check_mpi_call(MPI_Comm_rank(com_, &num), "MPI_Comm_rank");
-        return num;
-      } else
-        return 0;
+      int r = 0;
+      if (has_env) check_mpi_call(MPI_Comm_rank(com_, &r), "MPI_Comm_rank");
+      return r;
     }
 
     /**
@@ -78,12 +73,9 @@ namespace mpi {
      * @return The result of `MPI_Comm_size` if mpi::has_env is true, otherwise 1.
      */
     [[nodiscard]] int size() const {
-      if (has_env) {
-        int num = 0;
-        check_mpi_call(MPI_Comm_size(com_, &num), "MPI_Comm_size");
-        return num;
-      } else
-        return 1;
+      int s = 1;
+      if (has_env) check_mpi_call(MPI_Comm_size(com_, &s), "MPI_Comm_size");
+      return s;
     }
 
     /**
@@ -99,12 +91,9 @@ namespace mpi {
      * return a default constructed mpi::communicator.
      */
     [[nodiscard]] communicator split(int color, int key = 0) const {
-      if (has_env) {
-        communicator c;
-        check_mpi_call(MPI_Comm_split(com_, color, key, &c.com_), "MPI_Comm_split");
-        return c;
-      } else
-        return {};
+      communicator c{};
+      if (has_env) check_mpi_call(MPI_Comm_split(com_, color, key, &c.com_), "MPI_Comm_split");
+      return c;
     }
 
     [[nodiscard]] shared_communicator split_shared(int split_type = MPI_COMM_TYPE_SHARED, int key = 0) const;
@@ -122,12 +111,9 @@ namespace mpi {
      * otherwise return a default constructed mpi::communicator.
      */
     [[nodiscard]] communicator duplicate() const {
-      if (has_env) {
-        communicator c;
-        check_mpi_call(MPI_Comm_dup(com_, &c.com_), "MPI_Comm_dup");
-        return c;
-      } else
-        return {};
+      communicator c{};
+      if (has_env) check_mpi_call(MPI_Comm_dup(com_, &c.com_), "MPI_Comm_dup");
+      return c;
     }
 
     /**
@@ -140,7 +126,7 @@ namespace mpi {
      * Does nothing, if mpi::has_env is false.
      */
     void free() {
-      if (has_env) { check_mpi_call(MPI_Comm_free(&com_), "MPI_Comm_free"); }
+      if (has_env && !is_null()) check_mpi_call(MPI_Comm_free(&com_), "MPI_Comm_free");
     }
 
     /**
@@ -148,10 +134,11 @@ namespace mpi {
      * @param error_code The error code to pass to `MPI_Abort`.
      */
     void abort(int error_code) const {
-      if (has_env)
+      if (has_env) {
         check_mpi_call(MPI_Abort(com_, error_code), "MPI_Abort");
-      else
+      } else {
         std::abort();
+      }
     }
 
 #ifdef BOOST_MPI_HPP
@@ -223,12 +210,9 @@ namespace mpi {
    * @return New communicator.
    */
   [[nodiscard]] inline shared_communicator communicator::split_shared(int split_type, int key) const {
-    if (has_env) {
-      shared_communicator c;
-      MPI_Comm_split_type(com_, split_type, key, MPI_INFO_NULL, &c.com_);
-      return c;
-    } else
-      return {};
+    shared_communicator c{};
+    if (has_env) check_mpi_call(MPI_Comm_split_type(com_, split_type, key, MPI_INFO_NULL, &c.com_), "MPI_Comm_split_type");
+    return c;
   }
 
 } // namespace mpi
