@@ -356,89 +356,93 @@ namespace mpi {
   };
 
   /**
-  * @brief A shared memory window abstraction using MPI.
-  *
-  * @details This class provides an interface for creating and managing an MPI shared memory window.
-  *
-  * @tparam BaseType The data type stored in the shared memory window.
-  */
+   * @brief A C++ wrapper around `MPI_Win` representing a shared memory window.
+   *
+   * @details This class provides an interface for creating and managing an MPI shared memory window.
+   *
+   * @tparam BaseType The type of elements stored in the shared memory window.
+   */
   template <class BaseType> class shared_window : public window<BaseType> {
     public:
-    /// Default constructor
+    ///Construct a shared memory window with `MPI_WIN_NULL`.
     shared_window() = default;
 
     /**
-     * @brief Constructs a shared memory window.
+     * @brief Construct a shared memory window by dynamically allocating memory.
      *
-     * @details This constructor allocates shared memory within the given communicator.
+     * @details This constructor allocates a shared memory window within the given communicator by calling
+     * `MPI_Win_allocate_shared`. The allocated memory is automatically freed when the window is destroyed.
      *
-     * @param c The shared communicator.
-     * @param size The number of elements of type @p BaseType to allocate.
-     * @param info MPI_Info object for optimization hints.
+     * @param c mpi::shared_communicator object.
+     * @param sz Number of elements to allocate for the calling process.
+     * @param info Additional MPI information.
      */
-    explicit shared_window(shared_communicator const &c, MPI_Aint size, MPI_Info info = MPI_INFO_NULL) noexcept {
-      ASSERT(size >= 0)
+    explicit shared_window(shared_communicator const &c, MPI_Aint sz, MPI_Info info = MPI_INFO_NULL) {
+      ASSERT(sz >= 0)
+      comm_ = c.get();
+      size_ = sz;
       if (has_env) {
-        void *baseptr = nullptr;
-        MPI_Win_allocate_shared(size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &baseptr, &(this->win_));
-        this->comm_ = c.get();
-        this->data_ = static_cast<BaseType *>(baseptr);
-        this->size_ = size;
+        check_mpi_call(MPI_Win_allocate_shared(size_ * sizeof(BaseType), sizeof(BaseType), info, c.get(), &data_, &win_), "MPI_Win_allocate_shared");
       } else {
-        this->owned_ = true;
-        this->comm_  = c.get();
-        this->data_  = new BaseType[size];
-        this->size_  = size;
+        owned_ = true;
+        data_  = new BaseType[size_]; // NOLINT (new is fine here)
       }
     }
 
     /**
-     * @brief Queries attributes of a shared memory window.
+     * @brief Query attributes of a shared memory window.
      *
-     * @details Retrieves the size, displacement unit, and base address of the shared memory region for a given rank.
+     * @details Retrieves the size, displacement unit, and a pointer to the beginning of the shared memory region for a
+     * specific rank.
      *
-     * @param rank The rank within the communicator (defaults to @p MPI_PROC_NULL for querying all ranks).
-     * @return A tuple containing (size in bytes, displacement unit, base pointer).
+     * @param rank Rank within the shared communicator.
+     * @return A tuple containing the size in bytes, the displacement unit in bytes and the base pointer.
      */
-    std::tuple<MPI_Aint, int, void *> query(int rank = MPI_PROC_NULL) const noexcept {
+    [[nodiscard]] std::tuple<MPI_Aint, int, void *> query(int rank = MPI_PROC_NULL) const {
       if (has_env) {
-        MPI_Aint size = 0;
-        int disp_unit = 0;
+        MPI_Aint sz   = 0;
+        int du        = 0;
         void *baseptr = nullptr;
-        MPI_Win_shared_query(this->win_, rank, &size, &disp_unit, &baseptr);
-        return {size, disp_unit, baseptr};
+        check_mpi_call(MPI_Win_shared_query(win_, rank, &sz, &du, &baseptr), "MPI_Win_shared_query");
+        return {sz, du, baseptr};
       } else {
-        return {this->size_ * sizeof(BaseType), sizeof(BaseType), this->data_};
+        return {size_, sizeof(BaseType), data_};
       }
     }
 
-    // Override the commonly used attributes of the window base class
+    /**
+     * @brief Get a pointer to the beginning of the shared memory region of a specific rank.
+     *
+     * @param rank Rank within the shared communicator.
+     * @return Pointer to the shared window of the given rank.
+     */
+    [[nodiscard]] BaseType *base(int rank = MPI_PROC_NULL) const { return static_cast<BaseType *>(std::get<2>(query(rank))); }
 
     /**
-     * @brief Returns the base address of the shared memory for a specific rank.
+     * @brief Get the size of the shared memory region of a specific rank.
      *
-     * @param rank The rank whose base address should be retrieved.
-     * @return A pointer to the base address.
+     * @param rank Rank within the shared communicator.
+     * @return Number of elements in the shared window of the given rank.
      */
-    BaseType *base(int rank = MPI_PROC_NULL) const noexcept { return static_cast<BaseType *>(std::get<2>(query(rank))); }
+    [[nodiscard]] MPI_Aint size(int rank = MPI_PROC_NULL) const { return std::get<0>(query(rank)) / sizeof(BaseType); }
 
     /**
-     * @brief Returns the number of elements stored in the shared memory window.
+     * @brief Get the displacement unit of the shared memory region of a specific rank.
      *
-     * @param rank The rank whose memory size should be retrieved.
-     * @return The number of elements in the shared window.
+     * @param rank Rank within the shared communicator.
+     * @return Displacement unit in bytes.
      */
-    MPI_Aint size(int rank = MPI_PROC_NULL) const noexcept { return std::get<0>(query(rank)) / sizeof(BaseType); }
+    [[nodiscard]] int disp_unit(int rank = MPI_PROC_NULL) const { return std::get<1>(query(rank)); }
 
-    /**
-     * @brief Returns the displacement unit of the shared memory.
-     *
-     * @param rank The rank whose displacement unit should be retrieved.
-     * @return The displacement unit.
-     */
-    int disp_unit(int rank = MPI_PROC_NULL) const noexcept { return std::get<1>(query(rank)); }
+    /// Get the mpi::shared_communicator associated with the window.
+    [[nodiscard]] shared_communicator get_communicator() const { return comm_.get(); }
 
-    shared_communicator get_communicator() { return this->comm_.get(); }
+    private:
+    using window<BaseType>::win_;
+    using window<BaseType>::comm_;
+    using window<BaseType>::owned_;
+    using window<BaseType>::data_;
+    using window<BaseType>::size_;
   };
 
   /** @} */
