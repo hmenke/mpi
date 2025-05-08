@@ -278,68 +278,60 @@ namespace mpi {
     }
 
     /**
-    * @brief Reads data from a remote memory window.
-    *
-    * @details This function retrieves data from a remote process's memory
-    *          window and stores it in a local buffer.
-    *
-    * @tparam TargetType The data type at the target memory.
-    * @tparam OriginType The data type at the origin memory.
-    * @param origin_addr Pointer to the memory buffer where the data will be stored.
-    * @param origin_count Number of elements to retrieve.
-    * @param target_rank Rank of the target process from which data is fetched.
-    * @param target_disp Displacement (in @p disp_unit) from the start of the target memory window.
-    * @param target_count Number of elements to read from the target. If negative or not specified, defaults to @p origin_count.
-    */
+     * @brief Read data from a remote memory window.
+     *
+     * @details This function retrieves data from the memory window on the given process by calling `MPI_get` and stores
+     * it in a local buffer.
+     *
+     * @tparam TargetType Value type of the target memory.
+     * @tparam OriginType Value type of the origin memory.
+     * @param origin_addr Pointer to the memory buffer where the data will be stored.
+     * @param origin_count Number of elements to retrieve.
+     * @param target_rank Rank of the target process from which data is fetched.
+     * @param target_disp Displacement from the start of the target memory window.
+     * @param target_count Number of elements to read from the target. If negative or not specified, defaults to
+     * `origin_count`.
+     */
     template <typename TargetType = BaseType, typename OriginType>
       requires(has_mpi_type<OriginType> && has_mpi_type<TargetType>)
-    void get(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const noexcept {
-      int target_count_ = target_count < 0 ? origin_count : target_count;
+    void get(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const {
+      ASSERT(origin_count >= 0 && target_disp >= 0);
+      target_count = target_count < 0 ? origin_count : target_count;
       if (has_env) {
-        MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
-        MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-        MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win_);
+        auto origin_datatype = mpi_type<OriginType>::get();
+        auto target_datatype = mpi_type<TargetType>::get();
+        check_mpi_call(MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, win_), "MPI_Get");
       } else {
-        if (target_rank != 0) { return; }
-
-        std::span<OriginType> origin(origin_addr, origin_count);
-        BaseType *target_begin = data_;
-        std::advance(target_begin, target_disp);
-        BaseType *target_end = target_begin;
-        std::advance(target_end, target_count_);
-        std::copy(target_begin, target_end, origin.begin());
+        std::copy(data_, data_ + target_count, origin_addr);
       }
     }
 
     /**
-    * @brief Writes data to a remote memory window.
-    *
-    * @details This function transfers data from a local buffer to a remote process's
-    *          memory window.
-    *
-    * @tparam TargetType The data type at the target memory.
-    * @tparam OriginType The data type at the origin memory.
-    * @param origin_addr Pointer to the local memory buffer containing the data to be sent.
-    * @param origin_count Number of elements to transfer.
-    * @param target_rank Rank of the target process to which data is written.
-    * @param target_disp Displacement (in @p disp_unit) from the start of the target memory window.
-    * @param target_count Number of elements to write to the target. If negative or not specified, defaults to @p origin_count.
-    */
+     * @brief Write data to a remote memory window.
+     *
+     * @details This function transfers data from a local buffer to the memory window on the given process by calling
+     * `MPI_Put`.
+     *
+     * @tparam TargetType Value type at the target memory.
+     * @tparam OriginType Value type at the origin memory.
+     * @param origin_addr Pointer to the local memory buffer containing the data to be sent.
+     * @param origin_count Number of elements to transfer.
+     * @param target_rank Rank of the target process to which data is written.
+     * @param target_disp Displacement from the start of the target memory window.
+     * @param target_count Number of elements to write to the target. If negative or not specified, defaults to
+     * `origin_count`.
+     */
     template <typename TargetType = BaseType, typename OriginType>
       requires(has_mpi_type<OriginType> && has_mpi_type<TargetType>)
-    void put(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const noexcept {
-      int target_count_ = target_count < 0 ? origin_count : target_count;
+    void put(OriginType *origin_addr, int origin_count, int target_rank, MPI_Aint target_disp = 0, int target_count = -1) const {
+      ASSERT(origin_count >= 0 && target_disp >= 0);
+      target_count = target_count < 0 ? origin_count : target_count;
       if (has_env) {
-        MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
-        MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-        MPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win_);
+        auto origin_datatype = mpi_type<OriginType>::get();
+        auto target_datatype = mpi_type<TargetType>::get();
+        check_mpi_call(MPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, win_), "MPI_Put");
       } else {
-        if (target_rank != 0) { return; }
-
-        std::span<OriginType> origin(origin_addr, origin_count);
-        BaseType *target_begin = data_;
-        std::advance(target_begin, target_disp);
-        std::copy(origin.begin(), origin.end(), target_begin);
+        std::copy(origin_addr, origin_addr + origin_count, data_);
       }
     }
 
