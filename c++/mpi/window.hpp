@@ -166,119 +166,115 @@ namespace mpi {
     }
 
     /**
-    * @brief Synchronizes all RMA operations within an access epoch.
-    *
-    * @details This function acts as a barrier for remote memory access (RMA)
-    *          operations, ensuring all previous operations on the window are
-    *          completed before continuing.  The call is collective on the group
-    *          of the window.
-    *
-    * @param assert program assertion.
-    */
-    void fence(int assert = 0) const noexcept {
-      if (has_env) { MPI_Win_fence(assert, win_); }
+     * @brief Synchronize all RMA operations within an access epoch by calling `MPI_Win_fence`.
+     *
+     * @details This function acts as a barrier for remote memory access (RMA) operations, ensuring all previous
+     * operations on the window are completed before continuing. The call is collective on the group of the window.
+     *
+     * @param assert Program assertion.
+     */
+    void fence(int assert = 0) const {
+      if (has_env) check_mpi_call(MPI_Win_fence(assert, win_), "MPI_Win_fence");
     }
 
     /**
-    * @brief Ensures completion of all outstanding RMA operations.
-    *
-    * @details This function forces all RMA operations issued to a specific rank (or all ranks)
-    *          to complete at both the origin and the target before proceeding.
-    *
-    * @param rank The rank to flush operations for. If negative or no rank is specified, flushes all ranks .
-    */
-    void flush(int rank = -1) const noexcept {
+     * @brief Ensure completion of all outstanding RMA operations.
+     *
+     * @details If the given target rank is \f$ < 0 \f$, it calls `MPI_Win_flush_all`. Otherwise, it calls
+     * `MPI_Win_flush`.
+     *
+     * @param rank Target rank.
+     */
+    void flush(int rank = -1) const {
       if (has_env) {
         if (rank < 0) {
-          MPI_Win_flush_all(win_);
+          check_mpi_call(MPI_Win_flush_all(win_), "MPI_Win_flush_all");
         } else {
-          MPI_Win_flush(rank, win_);
+          check_mpi_call(MPI_Win_flush(rank, win_), "MPI_Win_flush");
         }
       }
     }
 
     /**
-    * @brief Synchronizes the public and private copies of the window.
-    *
-    * @details Ensures that any updates to the local memory are visible in the public window
-    *          and vice versa.
-    */
-    void sync() const noexcept {
-      if (has_env) { MPI_Win_sync(win_); }
+     * @brief Synchronize the public and private copies of the window.
+     *
+     * @details It ensures that any updates to the local memory are visible in the public window and vice versa by
+     * calling `MPI_Win_sync`.
+     */
+    void sync() const {
+      if (has_env) check_mpi_call(MPI_Win_sync(win_), "MPI_Win_sync");
     }
 
     /**
-    * @brief Starts an RMA access epoch.
-    *
-    * @details Locks access to the memory window for a specific rank or all ranks,
-    *          preventing concurrent modifications.
-    *
-    * @param rank The rank to lock access for.
-    * @param lock_type The type of lock (e.g., @p MPI_LOCK_SHARED or @p MPI_LOCK_EXCLUSIVE).
-    * @param assert An assertion flag providing optimization hints to MPI.
-    */
-    void lock(int rank = -1, int lock_type = MPI_LOCK_SHARED, int assert = 0) const noexcept {
+     * @brief Start an RMA access epoch.
+     *
+     * @details It locks access to the memory window on a specific rank or all ranks, preventing concurrent
+     * modifications.
+     *
+     * If the given target rank is \f$ < 0 \f$, it calls `MPI_Win_lock_all`. Otherwise, it calls `MPI_Win_lock`.
+     *
+     * @param rank Target rank.
+     * @param lock_type Type of the lock (e.g. `MPI_LOCK_SHARED` or `MPI_LOCK_EXCLUSIVE`).
+     * @param assert An assertion flag providing optimization hints to MPI.
+     */
+    void lock(int rank = -1, int lock_type = MPI_LOCK_SHARED, int assert = 0) const {
       if (has_env) {
         if (rank < 0) {
-          MPI_Win_lock_all(assert, win_);
+          check_mpi_call(MPI_Win_lock_all(assert, win_), "MPI_Win_lock_all");
         } else {
-          MPI_Win_lock(lock_type, rank, assert, win_);
+          check_mpi_call(MPI_Win_lock(lock_type, rank, assert, win_), "MPI_Win_lock");
         }
       }
     }
 
     /**
-    * @brief Completes an RMA access epoch started by @p lock().
-    *
-    * @details Unlocks access to the memory window for a specific rank or all ranks,
-    *          allowing other processes to access or modify the window.
-    *
-    * @see lock
-    *
-    * @param rank The rank to unlock access for.
-    */
-    void unlock(int rank = -1) const noexcept {
+     * @brief Complete an RMA access epoch started by lock().
+     *
+     * @details It unlocks access to the memory window on a specific rank or all ranks, allowing other processes to
+     * access or modify the window.
+     *
+     * If the given target rank is \f$ < 0 \f$, it calls `MPI_Win_unlock_all`. Otherwise, it calls `MPI_Win_unlock`.
+     *
+     * @param rank Target rank.
+     */
+    void unlock(int rank = -1) const {
       if (has_env) {
         if (rank < 0) {
-          MPI_Win_unlock_all(win_);
+          check_mpi_call(MPI_Win_unlock_all(win_), "MPI_Win_unlock_all");
         } else {
-          MPI_Win_unlock(rank, win_);
+          check_mpi_call(MPI_Win_unlock(rank, win_), "MPI_Win_unlock");
         }
       }
     }
 
     /**
-    * @brief Starts an RMA access epoch.
-    *
-    * @param grp The group of target processes.
-    * @param assert An assertion flag providing optimization hints to MPI.
-    */
-    void start(group const &grp, int assert = 0) const noexcept {
-      if (has_env) { MPI_Win_start(grp.get(), assert, win_); }
+     * @brief Start an RMA access epoch by calling `MPI_Win_start` (see also complete()).
+     *
+     * @param grp mpi::group of target processes.
+     * @param assert An assertion flag providing optimization hints to MPI.
+     */
+    void start(group const &grp, int assert = 0) const {
+      if (has_env) check_mpi_call(MPI_Win_start(grp.get(), assert, win_), "MPI_Win_start");
+    }
+
+    /// Completes an RMA access epoch by calling `MPI_Win_complete` (see also start()).
+    void complete() const {
+      if (has_env) check_mpi_call(MPI_Win_complete(win_), "MPI_Win_complete");
     }
 
     /**
-    * @brief Completes an RMA access epoch on win started by a call to @p start.
-    */
-    void complete() const noexcept {
-      if (has_env) { MPI_Win_complete(win_); }
+     * @brief Start an RMA exposure epoch by calling `MPI_Win_post` (see also wait()).
+     *
+     * @param grp mpi::group of origin processes.
+     * @param assert An assertion flag providing optimization hints to MPI.
+     */
+    void post(group const &grp, int assert = 0) const {
+      if (has_env) check_mpi_call(MPI_Win_post(grp.get(), assert, win_), "MPI_Win_post");
     }
 
-    /**
-    * @brief Starts an RMA exposure epoch for the local window.
-    *
-    * @param grp The group of origin processes.
-    * @param assert An assertion flag providing optimization hints to MPI.
-    */
-    void post(group const &grp, int assert = 0) const noexcept {
-      if (has_env) { MPI_Win_post(grp.get(), assert, win_); }
-    }
-
-    /**
-    * @brief Completes an RMA exposure epoch started by a call to @p post.
-    */
-    void wait() const noexcept {
-      if (has_env) { MPI_Win_wait(win_); }
+    /// Completes an RMA exposure epoch by calling `MPI_Win_wait` (see also post()).
+    void wait() const {
+      if (has_env) check_mpi_call(MPI_Win_wait(win_), "MPI_Win_wait");
     }
 
     /**
