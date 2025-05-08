@@ -53,29 +53,24 @@ namespace mpi {
 
   template <class BaseType> class window {
     friend class shared_window<BaseType>;
-    MPI_Win _win{MPI_WIN_NULL};
-    communicator _comm{MPI_COMM_NULL};
-    bool _owned{true};
-    BaseType *_data{nullptr};
-    MPI_Aint _size{0};
 
     public:
     window()               = default;
     window(window const &) = delete;
     window(window &&other) noexcept
-       : _win{std::exchange(other._win, MPI_WIN_NULL)},
-         _owned{std::exchange(other._owned, true)},
-         _data{std::exchange(other._data, nullptr)},
-         _size{std::exchange(other._size, 0)} {}
+       : win_{std::exchange(other.win_, MPI_WIN_NULL)},
+         owned_{std::exchange(other.owned_, true)},
+         data_{std::exchange(other.data_, nullptr)},
+         size_{std::exchange(other.size_, 0)} {}
     window &operator=(window const &) = delete;
     window &operator=(window &&rhs) noexcept {
       if (this != std::addressof(rhs)) {
         this->free();
-        this->_win   = std::exchange(rhs._win, MPI_WIN_NULL);
-        this->_comm  = std::exchange(rhs._comm, communicator(MPI_COMM_NULL));
-        this->_owned = std::exchange(rhs._owned, true);
-        this->_data  = std::exchange(rhs._data, nullptr);
-        this->_size  = std::exchange(rhs._size, 0);
+        this->win_   = std::exchange(rhs.win_, MPI_WIN_NULL);
+        this->comm_  = std::exchange(rhs.comm_, communicator(MPI_COMM_NULL));
+        this->owned_ = std::exchange(rhs.owned_, true);
+        this->data_  = std::exchange(rhs.data_, nullptr);
+        this->size_  = std::exchange(rhs.size_, 0);
       }
       return *this;
     }
@@ -92,17 +87,17 @@ namespace mpi {
     * @param size The number of elements of type @p BaseType in the buffer. (default @p 0)
     * @param info Additional MPI information. (default @p MPI_INFO_NULL)
     */
-    explicit window(communicator const &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) : _comm(c.get()) {
+    explicit window(communicator const &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) : comm_(c.get()) {
       ASSERT(size >= 0)
       ASSERT(!(base == nullptr && size > 0))
       if (has_env) {
-        MPI_Win_create(base, size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &_win);
-        _data = base;
-        _size = size;
+        MPI_Win_create(base, size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &win_);
+        data_ = base;
+        size_ = size;
       } else {
-        _owned = false;
-        _data  = base;
-        _size  = size;
+        owned_ = false;
+        data_  = base;
+        size_  = size;
       }
     }
 
@@ -118,17 +113,17 @@ namespace mpi {
     * @param size The number of elements of type @p BaseType to allocate. (default @p 0)
     * @param info Additional MPI information. (default @p MPI_INFO_NULL)
     */
-    explicit window(communicator const &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept : _comm(c.get()) {
+    explicit window(communicator const &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept : comm_(c.get()) {
       ASSERT(size >= 0)
       if (has_env) {
         void *baseptr = nullptr;
-        MPI_Win_allocate(size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &baseptr, &_win);
-        _data = static_cast<BaseType *>(baseptr);
-        _size = size;
+        MPI_Win_allocate(size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &baseptr, &win_);
+        data_ = static_cast<BaseType *>(baseptr);
+        size_ = size;
       } else {
-        _owned = true;
-        _data  = new BaseType[size];
-        _size  = size;
+        owned_ = true;
+        data_  = new BaseType[size];
+        size_  = size;
       }
     }
 
@@ -146,19 +141,19 @@ namespace mpi {
     */
     virtual ~window() { free(); }
 
-    explicit operator MPI_Win() const noexcept { return _win; };
-    explicit operator MPI_Win *() noexcept { return &_win; };
+    explicit operator MPI_Win() const noexcept { return win_; };
+    explicit operator MPI_Win *() noexcept { return &win_; };
 
     void free() noexcept {
       if (has_env) {
-        if (_win != MPI_WIN_NULL) {
+        if (win_ != MPI_WIN_NULL) {
           this->fence();
-          MPI_Win_free(&_win);
+          MPI_Win_free(&win_);
         }
       } else {
-        if (_owned) { delete[] _data; }
-        _data = nullptr;
-        _size = 0;
+        if (owned_) { delete[] data_; }
+        data_ = nullptr;
+        size_ = 0;
       }
     }
 
@@ -173,7 +168,7 @@ namespace mpi {
     * @param assert program assertion.
     */
     void fence(int assert = 0) const noexcept {
-      if (has_env) { MPI_Win_fence(assert, _win); }
+      if (has_env) { MPI_Win_fence(assert, win_); }
     }
 
     /**
@@ -187,9 +182,9 @@ namespace mpi {
     void flush(int rank = -1) const noexcept {
       if (has_env) {
         if (rank < 0) {
-          MPI_Win_flush_all(_win);
+          MPI_Win_flush_all(win_);
         } else {
-          MPI_Win_flush(rank, _win);
+          MPI_Win_flush(rank, win_);
         }
       }
     }
@@ -201,7 +196,7 @@ namespace mpi {
     *          and vice versa.
     */
     void sync() const noexcept {
-      if (has_env) { MPI_Win_sync(_win); }
+      if (has_env) { MPI_Win_sync(win_); }
     }
 
     /**
@@ -217,9 +212,9 @@ namespace mpi {
     void lock(int rank = -1, int lock_type = MPI_LOCK_SHARED, int assert = 0) const noexcept {
       if (has_env) {
         if (rank < 0) {
-          MPI_Win_lock_all(assert, _win);
+          MPI_Win_lock_all(assert, win_);
         } else {
-          MPI_Win_lock(lock_type, rank, assert, _win);
+          MPI_Win_lock(lock_type, rank, assert, win_);
         }
       }
     }
@@ -237,9 +232,9 @@ namespace mpi {
     void unlock(int rank = -1) const noexcept {
       if (has_env) {
         if (rank < 0) {
-          MPI_Win_unlock_all(_win);
+          MPI_Win_unlock_all(win_);
         } else {
-          MPI_Win_unlock(rank, _win);
+          MPI_Win_unlock(rank, win_);
         }
       }
     }
@@ -251,14 +246,14 @@ namespace mpi {
     * @param assert An assertion flag providing optimization hints to MPI.
     */
     void start(group const &grp, int assert = 0) const noexcept {
-      if (has_env) { MPI_Win_start(grp.get(), assert, _win); }
+      if (has_env) { MPI_Win_start(grp.get(), assert, win_); }
     }
 
     /**
     * @brief Completes an RMA access epoch on win started by a call to @p start.
     */
     void complete() const noexcept {
-      if (has_env) { MPI_Win_complete(_win); }
+      if (has_env) { MPI_Win_complete(win_); }
     }
 
     /**
@@ -268,14 +263,14 @@ namespace mpi {
     * @param assert An assertion flag providing optimization hints to MPI.
     */
     void post(group const &grp, int assert = 0) const noexcept {
-      if (has_env) { MPI_Win_post(grp.get(), assert, _win); }
+      if (has_env) { MPI_Win_post(grp.get(), assert, win_); }
     }
 
     /**
     * @brief Completes an RMA exposure epoch started by a call to @p post.
     */
     void wait() const noexcept {
-      if (has_env) { MPI_Win_wait(_win); }
+      if (has_env) { MPI_Win_wait(win_); }
     }
 
     /**
@@ -299,12 +294,12 @@ namespace mpi {
       if (has_env) {
         MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
         MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-        MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, _win);
+        MPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win_);
       } else {
         if (target_rank != 0) { return; }
 
         std::span<OriginType> origin(origin_addr, origin_count);
-        BaseType *target_begin = _data;
+        BaseType *target_begin = data_;
         std::advance(target_begin, target_disp);
         BaseType *target_end = target_begin;
         std::advance(target_end, target_count_);
@@ -333,12 +328,12 @@ namespace mpi {
       if (has_env) {
         MPI_Datatype origin_datatype = mpi_type<OriginType>::get();
         MPI_Datatype target_datatype = mpi_type<TargetType>::get();
-        MPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, _win);
+        MPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count_, target_datatype, win_);
       } else {
         if (target_rank != 0) { return; }
 
         std::span<OriginType> origin(origin_addr, origin_count);
-        BaseType *target_begin = _data;
+        BaseType *target_begin = data_;
         std::advance(target_begin, target_disp);
         std::copy(origin.begin(), origin.end(), target_begin);
       }
@@ -356,7 +351,7 @@ namespace mpi {
       if (has_env) {
         int flag;
         void *attribute_val;
-        MPI_Win_get_attr(_win, win_keyval, &attribute_val, &flag);
+        MPI_Win_get_attr(win_, win_keyval, &attribute_val, &flag);
         ASSERT(flag)
         return attribute_val;
       } else {
@@ -374,10 +369,10 @@ namespace mpi {
     */
     BaseType *base() const noexcept {
       if (has_env) {
-        if (_win == MPI_WIN_NULL) { return nullptr; }
+        if (win_ == MPI_WIN_NULL) { return nullptr; }
         return static_cast<BaseType *>(get_attr(MPI_WIN_BASE));
       } else {
-        return _data;
+        return data_;
       }
     }
 
@@ -393,7 +388,7 @@ namespace mpi {
       if (has_env) {
         return *static_cast<MPI_Aint *>(get_attr(MPI_WIN_SIZE));
       } else {
-        return _size * sizeof(BaseType);
+        return size_ * sizeof(BaseType);
       }
     }
 
@@ -413,10 +408,17 @@ namespace mpi {
       }
     }
 
-    BaseType *&data() noexcept { return _data; }
-    BaseType &data() const noexcept { return _data; }
+    BaseType *&data() noexcept { return data_; }
+    BaseType &data() const noexcept { return data_; }
 
-    communicator get_communicator() noexcept { return _comm.get(); }
+    communicator get_communicator() noexcept { return comm_.get(); }
+
+    protected:
+    MPI_Win win_{MPI_WIN_NULL};
+    communicator comm_{MPI_COMM_NULL};
+    bool owned_{true};
+    BaseType *data_{nullptr};
+    MPI_Aint size_{0};
   };
 
   /**
@@ -444,15 +446,15 @@ namespace mpi {
       ASSERT(size >= 0)
       if (has_env) {
         void *baseptr = nullptr;
-        MPI_Win_allocate_shared(size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &baseptr, &(this->_win));
-        this->_comm = c.get();
-        this->_data = static_cast<BaseType *>(baseptr);
-        this->_size = size;
+        MPI_Win_allocate_shared(size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &baseptr, &(this->win_));
+        this->comm_ = c.get();
+        this->data_ = static_cast<BaseType *>(baseptr);
+        this->size_ = size;
       } else {
-        this->_owned = true;
-        this->_comm  = c.get();
-        this->_data  = new BaseType[size];
-        this->_size  = size;
+        this->owned_ = true;
+        this->comm_  = c.get();
+        this->data_  = new BaseType[size];
+        this->size_  = size;
       }
     }
 
@@ -469,10 +471,10 @@ namespace mpi {
         MPI_Aint size = 0;
         int disp_unit = 0;
         void *baseptr = nullptr;
-        MPI_Win_shared_query(this->_win, rank, &size, &disp_unit, &baseptr);
+        MPI_Win_shared_query(this->win_, rank, &size, &disp_unit, &baseptr);
         return {size, disp_unit, baseptr};
       } else {
-        return {this->_size * sizeof(BaseType), sizeof(BaseType), this->_data};
+        return {this->size_ * sizeof(BaseType), sizeof(BaseType), this->data_};
       }
     }
 
@@ -502,7 +504,7 @@ namespace mpi {
      */
     int disp_unit(int rank = MPI_PROC_NULL) const noexcept { return std::get<1>(query(rank)); }
 
-    shared_communicator get_communicator() { return this->_comm.get(); }
+    shared_communicator get_communicator() { return this->comm_.get(); }
   };
 
   /** @} */
