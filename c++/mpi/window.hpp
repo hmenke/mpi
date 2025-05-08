@@ -335,79 +335,23 @@ namespace mpi {
       }
     }
 
-    /**
-    * @brief Retrieves the value of a window attribute.
-    *
-    * @details This function queries an attribute associated with an MPI window.
-    *
-    * @param win_keyval The key identifying the attribute.
-    * @return A pointer to the attribute value.
-    */
-    void *get_attr(int win_keyval) const noexcept {
-      if (has_env) {
-        int flag;
-        void *attribute_val;
-        MPI_Win_get_attr(win_, win_keyval, &attribute_val, &flag);
-        ASSERT(flag)
-        return attribute_val;
-      } else {
-        ASSERT(has_env)
-        return nullptr;
-      }
-    }
+    /// Get a pointer to the beginning of the window memory.
+    [[nodiscard]] BaseType *base() const { return data_; }
 
-    /**
-    * @brief Retrieves the base address of the memory window.
-    *
-    * @details This function returns a pointer to the base address of the memory associated with the MPI window.
-    *
-    * @return A pointer to the base address of the window memory.
-    */
-    BaseType *base() const noexcept {
-      if (has_env) {
-        if (win_ == MPI_WIN_NULL) { return nullptr; }
-        return static_cast<BaseType *>(get_attr(MPI_WIN_BASE));
-      } else {
-        return data_;
-      }
-    }
+    /// Get the size of the window in bytes.
+    [[nodiscard]] MPI_Aint size() const { return size_ * sizeof(BaseType); }
 
-    /**
-    * @brief Retrieves the size of the memory window.
-    *
-    * @details This function returns the total size (in bytes) of the memory associated with the MPI window.
-    *
-    * @return The size of the MPI window in bytes.
-    */
+    /// Get the displacement unit in bytes.
+    [[nodiscard]] int disp_unit() const { return sizeof(BaseType); }
 
-    MPI_Aint size() const noexcept {
-      if (has_env) {
-        return *static_cast<MPI_Aint *>(get_attr(MPI_WIN_SIZE));
-      } else {
-        return size_ * sizeof(BaseType);
-      }
-    }
+    /// Get a pointer to the beginning of the window memory.
+    [[nodiscard]] BaseType *data() noexcept { return data_; }
 
-    /**
-    * @brief Retrieves the displacement unit of the memory window.
-    *
-    * @details The displacement unit determines the scaling factor for address displacements.
-    *
-    * @return The displacement unit (in bytes).
-    */
+    /// Get a pointer to the beginning of the window memory.
+    [[nodiscard]] BaseType *data() const noexcept { return data_; }
 
-    int disp_unit() const noexcept {
-      if (has_env) {
-        return *static_cast<int *>(get_attr(MPI_WIN_DISP_UNIT));
-      } else {
-        return sizeof(BaseType);
-      }
-    }
-
-    BaseType *&data() noexcept { return data_; }
-    BaseType &data() const noexcept { return data_; }
-
-    communicator get_communicator() noexcept { return comm_.get(); }
+    /// Get the mpi::communicator associated with the window.
+    [[nodiscard]] communicator get_communicator() const { return comm_.get(); }
 
     protected:
     MPI_Win win_{MPI_WIN_NULL};
