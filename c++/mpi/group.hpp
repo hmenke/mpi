@@ -23,11 +23,12 @@
 
 #include "./communicator.hpp"
 #include "./environment.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
-#include <cstdlib>
-#include <unistd.h>
+#include <utility>
+#include <vector>
 
 namespace mpi {
 
@@ -54,14 +55,14 @@ namespace mpi {
     /// Move assignment operator leaves moved-from object with @p MPI_GROUP_NULL.
     group &operator=(group &&rhs) noexcept {
       if (this != std::addressof(rhs)) {
-        this->free();
-        this->grp_ = std::exchange(rhs.grp_, MPI_GROUP_NULL);
+        free();
+        grp_ = std::exchange(rhs.grp_, MPI_GROUP_NULL);
       }
       return *this;
     }
 
     /// Destructor
-    virtual ~group() { free(); }
+    ~group() { free(); }
 
     /**
      * @brief Take ownership of an existing @p MPI_Group object.
@@ -74,7 +75,7 @@ namespace mpi {
      * @param c The communicator from which to create a group.
      */
     explicit group(communicator c) {
-      if (has_env) { MPI_Comm_group(c.get(), &grp_); }
+      if (has_env) check_mpi_call(MPI_Comm_group(c.get(), &grp_), "MPI_Comm_group");
     }
 
     /// Get the wrapped @p MPI_Group object.
@@ -85,16 +86,16 @@ namespace mpi {
 
     /// Rank of the calling process in the given group.
     [[nodiscard]] int rank() const {
-      int rank = 0;
-      if (has_env) { MPI_Group_rank(grp_, &rank); }
-      return rank;
+      int r = 0;
+      if (has_env) check_mpi_call(MPI_Group_rank(grp_, &r), "MPI_Group_rank");
+      return r;
     }
 
     /// Size of a group.
     [[nodiscard]] int size() const {
-      int size = 1;
-      if (has_env) { MPI_Group_size(grp_, &size); }
-      return size;
+      int s = 1;
+      if (has_env) check_mpi_call(MPI_Group_size(grp_, &s), "MPI_Group_size");
+      return s;
     }
 
     /**
@@ -102,17 +103,15 @@ namespace mpi {
      * @param ranks List of ranks to include in the new group.
      * @return New group containing only the listed members.
      */
-    group include(std::vector<int> const &ranks) const {
+    [[nodiscard]] group include(std::vector<int> const &ranks) const {
       MPI_Group newgroup = MPI_GROUP_NULL;
-      if (has_env) { MPI_Group_incl(grp_, ranks.size(), ranks.data(), &newgroup); }
-      return group(newgroup);
+      if (has_env) check_mpi_call(MPI_Group_incl(grp_, static_cast<int>(ranks.size()), ranks.data(), &newgroup), "MPI_Group_incl");
+      return group{newgroup};
     }
 
     /// Free the group.
-    void free() {
-      if (has_env) {
-        if (grp_ != MPI_GROUP_NULL) { MPI_Group_free(&grp_); }
-      }
+    void free() noexcept {
+      if (has_env && !is_null()) MPI_Group_free(&grp_);
     }
 
     private:
