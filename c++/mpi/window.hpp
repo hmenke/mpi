@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief Provides a C++ wrapper class for the @p MPI_Win object.
+ * @brief Provides a C++ wrapper class for an `MPI_Win` object.
  */
 
 #pragma once
@@ -25,9 +25,13 @@
 #include "./datatypes.hpp"
 #include "./group.hpp"
 #include "./macros.hpp"
+#include "./utils.hpp"
 
 #include <mpi.h>
 
+#include <algorithm>
+#include <memory>
+#include <tuple>
 #include <utility>
 
 namespace mpi {
@@ -37,124 +41,128 @@ namespace mpi {
    * @{
    */
 
+  // Forward declaration.
   template <class BaseType> class shared_window;
 
   /**
-  * @brief A C++ wrapper around @p MPI_Win providing convenient memory window management.
-  *
-  * @details This class abstracts the complexities of MPI window management, allowing processes
-  *          in an MPI communicator to create and share memory regions efficiently. It supports
-  *          both local buffer-based windows and dynamically allocated memory windows.
-  *
-  *          If a base pointer is not specified, the constructor will allocate memory internally.
-  *
-  * @tparam BaseType The type of elements stored in the memory window.
-  */
-
+   * @brief A C++ wrapper around `MPI_Win` providing convenient memory window management.
+   *
+   * @details This class abstracts the complexities of MPI window management, allowing processes in an MPI communicator
+   * to create and share memory regions efficiently. It supports both local buffer-based windows and dynamically
+   * allocated memory windows.
+   *
+   * If a base pointer is not specified, the constructor will allocate memory internally.
+   *
+   * @tparam BaseType The type of elements stored in the memory window.
+   */
   template <class BaseType> class window {
-    friend class shared_window<BaseType>;
-
     public:
-    window()               = default;
+    /// Type of the base pointer.
+    using base_type = BaseType;
+
+    /// Construct a window with `MPI_WIN_NULL`.
+    window() = default;
+
+    /// Deleted copy constructor.
     window(window const &) = delete;
+
+    /// Deleted copy assignment operator.
+    window &operator=(window const &) = delete;
+
+    /// Move constructor takes ownership of the moved-from MPI window and leaves it with `MPI_WIN_NULL`.
     window(window &&other) noexcept
        : win_{std::exchange(other.win_, MPI_WIN_NULL)},
-         owned_{std::exchange(other.owned_, true)},
+         comm_{std::exchange(other.comm_, communicator{MPI_COMM_NULL})},
+         owned_{std::exchange(other.owned_, false)},
          data_{std::exchange(other.data_, nullptr)},
          size_{std::exchange(other.size_, 0)} {}
-    window &operator=(window const &) = delete;
+
+    /// Move assignment operator takes ownership of the moved-from MPI window and leaves it with `MPI_WIN_NULL`.
     window &operator=(window &&rhs) noexcept {
       if (this != std::addressof(rhs)) {
-        this->free();
-        this->win_   = std::exchange(rhs.win_, MPI_WIN_NULL);
-        this->comm_  = std::exchange(rhs.comm_, communicator(MPI_COMM_NULL));
-        this->owned_ = std::exchange(rhs.owned_, true);
-        this->data_  = std::exchange(rhs.data_, nullptr);
-        this->size_  = std::exchange(rhs.size_, 0);
+        free();
+        win_   = std::exchange(rhs.win_, MPI_WIN_NULL);
+        comm_  = std::exchange(rhs.comm_, communicator{MPI_COMM_NULL});
+        owned_ = std::exchange(rhs.owned_, false);
+        data_  = std::exchange(rhs.data_, nullptr);
+        size_  = std::exchange(rhs.size_, 0);
       }
       return *this;
     }
 
     /**
-    * @brief Constructs an MPI window over an existing local memory buffer.
-    *
-    * @details This constructor allows creating a window using a pre-allocated memory buffer.
-    *          The window provides access to the specified memory region across MPI processes
-    *          within the given communicator. The buffer is not freed upon destruction.
-    *
-    * @param c The MPI communicator that defines the group of processes sharing the window.
-    * @param base Pointer to the base address of the memory buffer.
-    * @param size The number of elements of type @p BaseType in the buffer. (default @p 0)
-    * @param info Additional MPI information. (default @p MPI_INFO_NULL)
-    */
-    explicit window(communicator const &c, BaseType *base, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept(false) : comm_(c.get()) {
-      ASSERT(size >= 0)
-      ASSERT(!(base == nullptr && size > 0))
-      if (has_env) {
-        MPI_Win_create(base, size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &win_);
-        data_ = base;
-        size_ = size;
-      } else {
-        owned_ = false;
-        data_  = base;
-        size_  = size;
-      }
+     * @brief Construct an MPI window over an existing local memory buffer.
+     *
+     * @details This constructor allows creating a window using a pre-allocated memory buffer by calling
+     * `MPI_Win_create`. The window provides access to the specified memory region across MPI processes within the given
+     * communicator. The buffer is not freed upon destruction.
+     *
+     * @param c mpi::communicator that defines the group of processes sharing the window.
+     * @param base_ptr Pointer to the base address of the memory buffer.
+     * @param sz Number of elements in the buffer.
+     * @param info Additional MPI information. Default is `MPI_INFO_NULL`.
+     */
+    explicit window(communicator const &c, BaseType *base_ptr, MPI_Aint sz, MPI_Info info = MPI_INFO_NULL)
+       : comm_(c.get()), data_(base_ptr), size_(sz) {
+      ASSERT(size_ >= 0)
+      ASSERT(!(data_ == nullptr && size_ > 0))
+      if (has_env) check_mpi_call(MPI_Win_create(data_, size_ * sizeof(BaseType), sizeof(BaseType), info, c.get(), &win_), "MPI_Win_create");
     }
 
     /**
-    * @brief Constructs an MPI window with dynamically allocated memory.
-    *
-    * @details This constructor allocates a new memory buffer locally and creates an MPI window
-    *          over it. The allocated memory is automatically freed when the window is destroyed.
-    *          This is useful when the memory region is meant to be shared across processes
-    *          without needing an external buffer.
-    *
-    * @param c The MPI communicator that defines the group of processes sharing the window.
-    * @param size The number of elements of type @p BaseType to allocate. (default @p 0)
-    * @param info Additional MPI information. (default @p MPI_INFO_NULL)
-    */
-    explicit window(communicator const &c, MPI_Aint size = 0, MPI_Info info = MPI_INFO_NULL) noexcept : comm_(c.get()) {
-      ASSERT(size >= 0)
+     * @brief Construct an MPI window with dynamically allocated memory.
+     *
+     * @details This constructor allocates a new memory buffer locally and creates an MPI window over it by calling
+     * `MPI_Win_allocate`. The allocated memory is automatically freed when the window is destroyed. This is useful when
+     * the memory region is meant to be shared across processes without needing an external buffer.
+     *
+     * @param c mpi::communicator that defines the group of processes sharing the window.
+     * @param sz Number of elements to allocate for the calling process.
+     * @param info Additional MPI information. Default is `MPI_INFO_NULL`.
+     */
+    explicit window(communicator const &c, MPI_Aint sz, MPI_Info info = MPI_INFO_NULL) : comm_(c.get()), size_(sz) {
+      ASSERT(size_ >= 0)
       if (has_env) {
-        void *baseptr = nullptr;
-        MPI_Win_allocate(size * sizeof(BaseType), sizeof(BaseType), info, c.get(), &baseptr, &win_);
-        data_ = static_cast<BaseType *>(baseptr);
-        size_ = size;
+        check_mpi_call(MPI_Win_allocate(size_ * sizeof(BaseType), sizeof(BaseType), info, c.get(), &data_, &win_), "MPI_Win_allocate");
       } else {
         owned_ = true;
-        data_  = new BaseType[size];
-        size_  = size;
+        data_  = new BaseType[size_]; // NOLINT (new is fine here)
       }
     }
 
-    /**
-    * @brief Destroys the window and releases allocated resources.
-    *
-    * Before freeing, a window must have completed all its involvement in RMA
-    * communications.  For that reason the destructor implicitly calls @p
-    * fence().  The window also must be unlocked if it has been previously
-    * locked, however, this cannot be detected and is therefore the
-    * responsibility of the caller.
-    *
-    * @details If the window owns an allocated memory buffer, it will be automatically freed.
-    *          Otherwise, only the MPI window handle is released.
-    */
+    /// Convert the window to the wrapped `MPI_Win` object.
+    explicit operator MPI_Win() const { return win_; };
+
+    /// Convert a pointer to the window to a pointer to the wrapped `MPI_Win` object.
+    explicit operator MPI_Win *() { return &win_; };
+
+    /// Destructor calls free() to release the window.
     virtual ~window() { free(); }
 
-    explicit operator MPI_Win() const noexcept { return win_; };
-    explicit operator MPI_Win *() noexcept { return &win_; };
-
+    /**
+     * @brief Release allocated resources owned by the window.
+     *
+     * @details Before freeing the owned memory or the `MPI_Win` handle, a window must have completed all its
+     * involvement in RMA communications. For that reason we call fence() before `MPI_Win_free`.
+     *
+     * The window also must be unlocked if it has been previously locked. However, this cannot be detected and is
+     * therefore the responsibility of the user.
+     *
+     * If the window owns an allocated memory buffer, it will be automatically freed. Otherwise, only the MPI window
+     * handle is released.
+     */
     void free() noexcept {
       if (has_env) {
         if (win_ != MPI_WIN_NULL) {
-          this->fence();
+          fence();
           MPI_Win_free(&win_);
         }
-      } else {
-        if (owned_) { delete[] data_; }
-        data_ = nullptr;
-        size_ = 0;
+      } else if (owned_) {
+        delete[] data_;
       }
+      owned_ = false;
+      data_  = nullptr;
+      size_  = 0;
     }
 
     /**
@@ -416,7 +424,7 @@ namespace mpi {
     protected:
     MPI_Win win_{MPI_WIN_NULL};
     communicator comm_{MPI_COMM_NULL};
-    bool owned_{true};
+    bool owned_{false};
     BaseType *data_{nullptr};
     MPI_Aint size_{0};
   };
