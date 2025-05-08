@@ -163,7 +163,7 @@ TEST(MPI_Window, NullptrSizeZero) {
   mpi::communicator world;
   mpi::window<int> win{world, nullptr, 0};
 
-  EXPECT_EQ(win.data(), nullptr);
+  EXPECT_EQ(win.base(), nullptr);
   EXPECT_EQ(win.size(), 0);
 }
 

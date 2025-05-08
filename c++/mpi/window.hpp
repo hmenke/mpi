@@ -344,12 +344,6 @@ namespace mpi {
     /// Get the displacement unit in bytes.
     [[nodiscard]] int disp_unit() const { return sizeof(BaseType); }
 
-    /// Get a pointer to the beginning of the window memory.
-    [[nodiscard]] BaseType *data() noexcept { return data_; }
-
-    /// Get a pointer to the beginning of the window memory.
-    [[nodiscard]] BaseType *data() const noexcept { return data_; }
-
     /// Get the mpi::communicator associated with the window.
     [[nodiscard]] communicator get_communicator() const { return comm_.get(); }
 
