@@ -44,13 +44,13 @@ var NAVTREE =
       [ "Compiling the examples", "examples.html#compiling", null ],
       [ "Example 1: Hello world!", "ex1.html", null ],
       [ "Example 2: Use monitor to communicate errors", "ex2.html", null ],
-      [ "Example 3: Custom type and operator", "ex3.html", null ],
-      [ "Example 4: Provide custom spezializations", "ex4.html", null ]
+      [ "Example 3: Custom type and operator", "ex3.html", null ]
     ] ],
     [ "API Documentation", "documentation.html", [
       [ "MPI essentials", "group__mpi__essentials.html", [
         [ "communicator", "classmpi_1_1communicator.html", null ],
-        [ "environment", "structmpi_1_1environment.html", null ]
+        [ "environment", "structmpi_1_1environment.html", null ],
+        [ "group", "classmpi_1_1group.html", null ]
       ] ],
       [ "MPI datatypes and operations", "group__mpi__types__ops.html", [
         [ "Serializable", "conceptmpi_1_1_serializable.html", null ],
@@ -74,11 +74,22 @@ var NAVTREE =
         ] ]
       ] ],
       [ "Collective MPI communication", "group__coll__comm.html", null ],
+      [ "MPI one-sided communication and shared memory", "group__mpi__osc__shm.html", [
+        [ "shared_communicator", "classmpi_1_1shared__communicator.html", null ],
+        [ "window", "classmpi_1_1window.html", null ],
+        [ "shared_window", "classmpi_1_1shared__window.html", null ]
+      ] ],
+      [ "Lazy MPI communication", "group__mpi__lazy.html", [
+        [ "lazy", "structmpi_1_1lazy.html", null ],
+        [ "gather tag", "structmpi_1_1tag_1_1gather.html", null ],
+        [ "reduce tag", "structmpi_1_1tag_1_1reduce.html", null ],
+        [ "scatter tag", "structmpi_1_1tag_1_1scatter.html", null ]
+      ] ],
       [ "Event handling", "group__event__handling.html", [
         [ "monitor", "classmpi_1_1monitor.html", null ]
       ] ],
       [ "Utilities", "group__utilities.html", [
-        [ "MPICompatibleRange", "conceptmpi_1_1_m_p_i_compatible_range.html", null ]
+        [ "contiguous_sized_range", "conceptmpi_1_1contiguous__sized__range.html", null ]
       ] ],
       [ "File List", "files.html", "files" ]
     ] ],

@@ -1,6 +1,4 @@
 var searchData=
 [
-  ['fetchcontent_0',['FetchContent',['../integration.html#fetch',1,'']]],
-  ['find_5fpackage_1',['find_package',['../integration.html#find_package',1,'']]],
-  ['fixes_2',['fixes',['../changelog.html#autotoc_md7',1,'']]]
+  ['general_0',['General',['../changelog.html#autotoc_md1',1,'General'],['../changelog.html#autotoc_md5',1,'General'],['../changelog.html#autotoc_md9',1,'General']]]
 ];

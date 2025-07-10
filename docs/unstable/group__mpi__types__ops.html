@@ -174,7 +174,7 @@ Functions</h2></td></tr>
 Variables</h2></td></tr>
 <tr class="memitem:gac117479a485f170ca920a64ba1e4ac34" id="r_gac117479a485f170ca920a64ba1e4ac34"><td class="memTemplParams" colspan="2">template&lt;typename T, typename = void&gt; </td></tr>
 <tr class="memitem:gac117479a485f170ca920a64ba1e4ac34 template"><td class="memItemLeft" align="right" valign="top">constexpr bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#gac117479a485f170ca920a64ba1e4ac34">mpi::has_mpi_type</a> = false</td></tr>
-<tr class="memdesc:gac117479a485f170ca920a64ba1e4ac34"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type trait to check if a type <span class="tt">T</span> has a corresponding MPI datatype, i.e. if <a class="el" href="structmpi_1_1mpi__type.html" title="Map C++ datatypes to the corresponding MPI datatypes.">mpi::mpi_type</a> has been specialized.  <br /></td></tr>
+<tr class="memdesc:gac117479a485f170ca920a64ba1e4ac34"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type trait to check if a type T has a corresponding MPI datatype, i.e. if <a class="el" href="structmpi_1_1mpi__type.html" title="Map C++ datatypes to the corresponding MPI datatypes.">mpi::mpi_type</a> has been specialized.  <br /></td></tr>
 <tr class="memitem:ga3b16e36ff8ecef29e60aa81ab4406328" id="r_ga3b16e36ff8ecef29e60aa81ab4406328"><td class="memTemplParams" colspan="2">template&lt;typename T&gt; </td></tr>
 <tr class="memitem:ga3b16e36ff8ecef29e60aa81ab4406328 template"><td class="memItemLeft" align="right" valign="top">constexpr bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ga3b16e36ff8ecef29e60aa81ab4406328">mpi::has_mpi_type&lt; T, std::void_t&lt; decltype(mpi_type&lt; T &gt;::get())&gt; &gt;</a> = true</td></tr>
 <tr class="memdesc:ga3b16e36ff8ecef29e60aa81ab4406328"><td class="mdescLeft">&#160;</td><td class="mdescRight">Specialization of <a class="el" href="#gac117479a485f170ca920a64ba1e4ac34" title="Type trait to check if a type T has a corresponding MPI datatype, i.e. if mpi::mpi_type has been spec...">mpi::has_mpi_type</a> for types which have a corresponding MPI datatype.  <br /></td></tr>
@@ -367,10 +367,10 @@ template&lt;typename T, typename = void&gt; </div>
 
 <p><code>#include &lt;<a class="el" href="datatypes_8hpp.html">mpi/datatypes.hpp</a>&gt;</code></p>
 
-<p>Type trait to check if a type <span class="tt">T</span> has a corresponding MPI datatype, i.e. if <a class="el" href="structmpi_1_1mpi__type.html" title="Map C++ datatypes to the corresponding MPI datatypes.">mpi::mpi_type</a> has been specialized. </p>
+<p>Type trait to check if a type T has a corresponding MPI datatype, i.e. if <a class="el" href="structmpi_1_1mpi__type.html" title="Map C++ datatypes to the corresponding MPI datatypes.">mpi::mpi_type</a> has been specialized. </p>
 <dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
-    <tr><td class="paramname">`T`</td><td>Type to be checked. </td></tr>
+    <tr><td class="paramname">T</td><td>Type to be checked. </td></tr>
   </table>
   </dd>
 </dl>

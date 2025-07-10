@@ -108,8 +108,14 @@ $(function(){initNavTree('group__utilities.html','',''); });
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-concepts" class="groupheader"><a id="concepts" name="concepts"></a>
 Concepts</h2></td></tr>
-<tr class="memitem:mpi_3A_3AMPICompatibleRange" id="r_mpi_3A_3AMPICompatibleRange"><td class="memItemLeft" align="right" valign="top">concept &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="conceptmpi_1_1_m_p_i_compatible_range.html">mpi::MPICompatibleRange</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A concept that checks if a range type is contiguous and sized and has an MPI compatible value type. <br /></td></tr>
+<tr class="memitem:mpi_3A_3Acontiguous_5Fsized_5Frange" id="r_mpi_3A_3Acontiguous_5Fsized_5Frange"><td class="memItemLeft" align="right" valign="top">concept &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="conceptmpi_1_1contiguous__sized__range.html">mpi::contiguous_sized_range</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A concept that checks if a range type is contiguous and sized. <br /></td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-typedef-members" class="groupheader"><a id="typedef-members" name="typedef-members"></a>
+Typedefs</h2></td></tr>
+<tr class="memitem:gabc2abaca95fbe7d5faf32c6998f20da8" id="r_gabc2abaca95fbe7d5faf32c6998f20da8"><td class="memTemplParams" colspan="2">template&lt;typename T&gt; </td></tr>
+<tr class="memitem:gabc2abaca95fbe7d5faf32c6998f20da8 template"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#gabc2abaca95fbe7d5faf32c6998f20da8">mpi::regular_t</a> = typename detail::_regular&lt;std::decay_t&lt;T&gt;&gt;::type</td></tr>
+<tr class="memdesc:gabc2abaca95fbe7d5faf32c6998f20da8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type trait to get the regular type of a type.  <br /></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
@@ -121,6 +127,35 @@ Functions</h2></td></tr>
 <tr class="memitem:ga6c4a796ead2a7fe817b93239da1f7663" id="r_ga6c4a796ead2a7fe817b93239da1f7663"><td class="memItemLeft" align="right" valign="top">long&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ga6c4a796ead2a7fe817b93239da1f7663">mpi::chunk_length</a> (long end, int nranges, int i, long min_size=1)</td></tr>
 <tr class="memdesc:ga6c4a796ead2a7fe817b93239da1f7663"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get the length of the i<sup>th</sup> subrange after splitting the integer range <span class="tt">[0, end)</span> as evenly as possible across <span class="tt">n</span> subranges.  <br /></td></tr>
 </table>
+<a name="doc-typedef-members" id="doc-typedef-members"></a><h2 id="header-doc-typedef-members" class="groupheader">Typedef Documentation</h2>
+<a id="gabc2abaca95fbe7d5faf32c6998f20da8" name="gabc2abaca95fbe7d5faf32c6998f20da8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#gabc2abaca95fbe7d5faf32c6998f20da8">&#9670;&#160;</a></span>regular_t</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">using <a class="el" href="#gabc2abaca95fbe7d5faf32c6998f20da8">mpi::regular_t</a> = typename detail::_regular&lt;std::decay_t&lt;T&gt;&gt;::type</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p><code>#include &lt;<a class="el" href="utils_8hpp.html">mpi/utils.hpp</a>&gt;</code></p>
+
+<p>Type trait to get the regular type of a type. </p>
+<dl class="tparams"><dt>Template Parameters</dt><dd>
+  <table class="tparams">
+    <tr><td class="paramname">T</td><td>Type to check. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="utils_8hpp_source.html#l00056">56</a> of file <a class="el" href="utils_8hpp_source.html">utils.hpp</a>.</p>
+
+</div>
+</div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
 <a id="gaee34d136ff5a6107c23f96092b8e20ec" name="gaee34d136ff5a6107c23f96092b8e20ec"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#gaee34d136ff5a6107c23f96092b8e20ec">&#9670;&#160;</a></span>check_mpi_call()</h2>
@@ -156,8 +191,8 @@ Functions</h2></td></tr>
 <p>It is intended to simply wrap any calls to the MPI C library: </p><div class="fragment"><div class="line"><span class="keywordtype">int</span> value = 5;</div>
 <div class="line"><span class="keywordtype">int</span> result = 0;</div>
 <div class="line"><a class="code hl_function" href="#gaee34d136ff5a6107c23f96092b8e20ec">check_mpi_call</a>(MPI_Allreduce(&amp;value, &amp;result, 1, <a class="code hl_struct" href="structmpi_1_1mpi__type.html">mpi::mpi_type&lt;int&gt;::get</a>(), MPI_MAX, comm.get()), <span class="stringliteral">&quot;MPI_Allreduce&quot;</span>);</div>
-<div class="ttc" id="agroup__utilities_html_gaee34d136ff5a6107c23f96092b8e20ec"><div class="ttname"><a href="#gaee34d136ff5a6107c23f96092b8e20ec">mpi::check_mpi_call</a></div><div class="ttdeci">void check_mpi_call(int errcode, const std::string &amp;mpi_routine)</div><div class="ttdoc">Check the success of an MPI call.</div><div class="ttdef"><b>Definition</b> <a href="utils_8hpp_source.html#l00051">utils.hpp:51</a></div></div>
-<div class="ttc" id="astructmpi_1_1mpi__type_html"><div class="ttname"><a href="structmpi_1_1mpi__type.html">mpi::mpi_type</a></div><div class="ttdoc">Map C++ datatypes to the corresponding MPI datatypes.</div><div class="ttdef"><b>Definition</b> <a href="datatypes_8hpp_source.html#l00057">datatypes.hpp:57</a></div></div>
+<div class="ttc" id="agroup__utilities_html_gaee34d136ff5a6107c23f96092b8e20ec"><div class="ttname"><a href="#gaee34d136ff5a6107c23f96092b8e20ec">mpi::check_mpi_call</a></div><div class="ttdeci">void check_mpi_call(int errcode, const std::string &amp;mpi_routine)</div><div class="ttdoc">Check the success of an MPI call.</div><div class="ttdef"><b>Definition</b> <a href="utils_8hpp_source.html#l00073">utils.hpp:73</a></div></div>
+<div class="ttc" id="astructmpi_1_1mpi__type_html"><div class="ttname"><a href="structmpi_1_1mpi__type.html">mpi::mpi_type</a></div><div class="ttdoc">Map C++ datatypes to the corresponding MPI datatypes.</div><div class="ttdef"><b>Definition</b> <a href="datatypes_8hpp_source.html#l00058">datatypes.hpp:58</a></div></div>
 </div><!-- fragment --><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">errcode</td><td>Error code returned by an MPI routine. </td></tr>
@@ -166,7 +201,7 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="utils_8hpp_source.html#l00051">51</a> of file <a class="el" href="utils_8hpp_source.html">utils.hpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="utils_8hpp_source.html#l00073">73</a> of file <a class="el" href="utils_8hpp_source.html">utils.hpp</a>.</p>
 
 </div>
 </div>
@@ -262,7 +297,7 @@ template&lt;typename R&gt; </div>
 
 <p>Get the length of the i<sup>th</sup> subrange after splitting the integer range <span class="tt">[0, end)</span> as evenly as possible across <span class="tt">n</span> subranges. </p>
 <p>The optional parameter <span class="tt">min_size</span> can be used to first divide the range into equal parts of size <span class="tt">min_size</span> before distributing them as evenly as possible across the number of specified subranges.</p>
-<p>It is expected that <span class="tt">min_size &gt; 0</span> and that <span class="tt">min_size</span> is a divisor of <span class="tt">end</span>.</p>
+<p>It throws an exception if <span class="tt">min_size &lt; 1</span> or if it is not a divisor of <span class="tt">end</span>.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">end</td><td>End of the integer range <span class="tt">[0, end)</span>. </td></tr>

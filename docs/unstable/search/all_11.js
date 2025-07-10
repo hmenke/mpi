@@ -1,6 +1,4 @@
 var searchData=
 [
-  ['pair_2ehpp_0',['pair.hpp',['../pair_8hpp.html',1,'']]],
-  ['projects_1',['Integration in C++ projects',['../integration.html',1,'']]],
-  ['provide_20custom_20spezializations_2',['Example 4: Provide custom spezializations',['../ex4.html',1,'']]]
+  ['query_0',['query',['../classmpi_1_1shared__window.html#a680dee01ec42cbfb5230f92a5b9ca78e',1,'mpi::shared_window']]]
 ];

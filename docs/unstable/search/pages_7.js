@@ -1,7 +1,11 @@
 var searchData=
 [
-  ['datatypes_20and_20operations_0',['MPI datatypes and operations',['../documentation.html#autotoc_md14',1,'']]],
-  ['dependencies_1',['Dependencies',['../installation.html#dependencies',1,'']]],
-  ['doc_2',['doc',['../changelog.html#autotoc_md3',1,'doc'],['../changelog.html#autotoc_md10',1,'doc']]],
-  ['documentation_3',['API Documentation',['../documentation.html',1,'']]]
+  ['errors_0',['Example 2: Use monitor to communicate errors',['../ex2.html',1,'']]],
+  ['essentials_1',['MPI essentials',['../documentation.html#autotoc_md13',1,'']]],
+  ['event_20handling_2',['Event handling',['../documentation.html#autotoc_md18',1,'']]],
+  ['example_201_3a_20hello_20world_3',['Example 1: Hello world!',['../ex1.html',1,'']]],
+  ['example_202_3a_20use_20monitor_20to_20communicate_20errors_4',['Example 2: Use monitor to communicate errors',['../ex2.html',1,'']]],
+  ['example_203_3a_20custom_20type_20and_20operator_5',['Example 3: Custom type and operator',['../ex3.html',1,'']]],
+  ['examples_6',['Examples',['../examples.html',1,'']]],
+  ['examples_7',['Compiling the examples',['../examples.html#compiling',1,'']]]
 ];

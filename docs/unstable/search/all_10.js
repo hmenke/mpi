@@ -1,10 +1,7 @@
 var searchData=
 [
-  ['operations_0',['operations',['../group__mpi__types__ops.html',1,'MPI datatypes and operations'],['../documentation.html#autotoc_md14',1,'MPI datatypes and operations']]],
-  ['operator_1',['Example 3: Custom type and operator',['../ex3.html',1,'']]],
-  ['operator_3d_2',['operator=',['../classmpi_1_1monitor.html#a6cdd72fab490ab60401d09b7047a15a6',1,'mpi::monitor']]],
-  ['operators_2ehpp_3',['operators.hpp',['../operators_8hpp.html',1,'']]],
-  ['options_4',['Custom CMake options',['../installation.html#cmake_options',1,'']]],
-  ['other_5',['Other',['../integration.html#other',1,'']]],
-  ['overview_6',['Overview',['../index.html',1,'']]]
+  ['pair_2ehpp_0',['pair.hpp',['../pair_8hpp.html',1,'']]],
+  ['post_1',['post',['../classmpi_1_1window.html#a65cd3ad53bc0ab6e34fe4728d3164f15',1,'mpi::window']]],
+  ['projects_2',['Integration in C++ projects',['../integration.html',1,'']]],
+  ['put_3',['put',['../classmpi_1_1window.html#a96bf293667d555a7b5b0d74e58020a79',1,'mpi::window']]]
 ];
