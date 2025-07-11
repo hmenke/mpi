@@ -49,21 +49,21 @@ jobs:
 
     - name: Compile MPI inside the container
       run: |
-        docker exec -t -w ${{ github.workspace }} docker-vm-1 /bin/bash -euxc '
+        docker exec -t -u runner -w ${{ github.workspace }} docker-vm-1 /bin/bash -euxc '
         cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$HOME/install -DBuild_Documentation=Off
         cmake --build build/ -j2
         '
 
     - name: Run tests inside the container
       run: |
-        docker exec -t -w ${{ github.workspace }} docker-vm-1 /bin/bash -euxc '
+        docker exec -t -u runner -w ${{ github.workspace }} docker-vm-1 /bin/bash -euxc '
         export CTEST_OUTPUT_ON_FAILURE=1
         cmake --build build/ --target test
         '
 
     - name: Run tests inside the container
       run: |
-        docker exec -t -w ${{ github.workspace }} docker-vm-1 /bin/bash -euxc '
+        docker exec -t -u runner -w ${{ github.workspace }} docker-vm-1 /bin/bash -euxc '
         cat <<EOF | tee hostfile
         docker-vm-1 slots=3
         docker-vm-2 slots=1

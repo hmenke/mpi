@@ -12,15 +12,14 @@ RUN apt-get update \
     openmpi-bin \
     openssh-server \
  && rm -rf /var/cache/apt /var/lib/apt/lists
-RUN passwd -d root \
+RUN useradd -m runner \
+ && passwd -d runner \
  && mkdir -pm0755 /run/sshd \
  && echo "PermitRootLogin yes" >> /etc/ssh/sshd_config.d/99-insecure.conf \
  && echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config.d/99-insecure.conf \
  && echo "PermitEmptyPasswords yes" >> /etc/ssh/sshd_config.d/99-insecure.conf \
  && echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config.d/99-insecure.conf \
  && echo "LogLevel ERROR" >> /etc/ssh/ssh_config.d/99-insecure.conf
-ENV OMPI_ALLOW_RUN_AS_ROOT=1
-ENV OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 ENV OMPI_MCA_btl_vader_single_copy_mechanism=none
 ENV OMPI_MCA_osc=sm,pt2pt
 ENV OMPI_MCA_rmaps_base_oversubscribe=yes
